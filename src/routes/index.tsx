@@ -47,6 +47,8 @@ import { usePublicProperties } from "@/hooks/use-public-properties";
 import { useServerFn } from "@tanstack/react-start";
 
 import { submitInquiry } from "@/lib/inquiries.functions";
+import { ConsentEmbed } from "@/components/consent/ConsentEmbed";
+import { openCookiePreferences } from "@/lib/consent";
 import { useSiteSettings, type PublicSettings } from "@/hooks/use-site-settings";
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -143,6 +145,9 @@ function HomePage() {
 }
 
 function BrandStyle({ primary, accent }: { primary: string; accent: string }) {
+  const safe = (c: string, d: string) => (/^#[0-9a-fA-F]{3,8}$|^(rgb|hsl|oklch)a?\([0-9.,%\s/a-z-]+\)$/.test(c?.trim() ?? "") ? c.trim() : d);
+  primary = safe(primary, "#0B1E3B");
+  accent = safe(accent, "#C9A961");
   const css = `:root{--navy:${primary};--navy-deep:${primary};--gold:${accent};--gold-soft:${accent};}`;
   return <style dangerouslySetInnerHTML={{ __html: css }} />;
 }
@@ -818,8 +823,9 @@ function Contact({ settings }: { settings: PublicSettings }) {
               title="Имейл"
               lines={[{ text: settings.email, href: `mailto:${settings.email}` }]}
             />
-            {settings.contact_map_embed && (
+            {settings.contact_map_embed?.startsWith("https://") && (
             <div className="overflow-hidden rounded-2xl border border-border shadow-sm">
+              <ConsentEmbed service="Google Maps" fallbackHref={settings.contact_map_url || undefined}>
               <iframe
                 title="Карта — Елла Недвижими Имоти"
                 src={settings.contact_map_embed}
@@ -829,6 +835,7 @@ function Contact({ settings }: { settings: PublicSettings }) {
                 loading="lazy"
                 referrerPolicy="no-referrer-when-downgrade"
               />
+              </ConsentEmbed>
             </div>
             )}
           </div>
@@ -884,6 +891,10 @@ function Contact({ settings }: { settings: PublicSettings }) {
             >
               {sending ? "Изпращане..." : "Изпрати запитване"}
             </Button>
+            <p className="mt-4 text-xs text-muted-foreground">
+              Използваме данните Ви само за да отговорим на запитването. Повече в{" "}
+              <Link to="/privacy" className="underline underline-offset-2 hover:text-foreground">Политиката за поверителност</Link>.
+            </p>
           </form>
         </div>
       </div>
@@ -996,7 +1007,7 @@ function Footer({ settings }: { settings: PublicSettings }) {
           </p>
         </div>
         <div>
-          <h4 className="font-display text-base text-gold">Навигация</h4>
+          <h2 className="font-display text-base text-gold">Навигация</h2>
           <ul className="mt-4 space-y-2 text-sm">
             {nav.map((n) => (
               <li key={n.href}>
@@ -1006,7 +1017,7 @@ function Footer({ settings }: { settings: PublicSettings }) {
           </ul>
         </div>
         <div>
-          <h4 className="font-display text-base text-gold">Контакт</h4>
+          <h2 className="font-display text-base text-gold">Контакт</h2>
           <ul className="mt-4 space-y-2 text-sm">
             {settings.phone1 && <li><a href={telHref(settings.phone1)} className="hover:text-gold">{settings.phone1}</a></li>}
             {settings.phone2 && <li><a href={telHref(settings.phone2)} className="hover:text-gold">{settings.phone2}</a></li>}
@@ -1014,7 +1025,7 @@ function Footer({ settings }: { settings: PublicSettings }) {
           </ul>
         </div>
         <div>
-          <h4 className="font-display text-base text-gold">Социални мрежи</h4>
+          <h2 className="font-display text-base text-gold">Социални мрежи</h2>
           <div className="mt-4 flex gap-3">
             {settings.facebook_url && <SocialLink href={settings.facebook_url} label="Facebook"><Facebook className="h-4 w-4" /></SocialLink>}
             {settings.instagram_url && <SocialLink href={settings.instagram_url} label="Instagram"><Instagram className="h-4 w-4" /></SocialLink>}
@@ -1023,7 +1034,14 @@ function Footer({ settings }: { settings: PublicSettings }) {
         </div>
       </div>
       <div className="border-t border-white/10 px-6 pb-24 pt-6 sm:px-6 sm:pb-6">
-        <p className="mx-auto max-w-[15rem] text-center text-xs leading-relaxed text-white/50 sm:max-w-md">{copyright}</p>
+        <nav aria-label="Правна информация" className="mx-auto mb-3 flex max-w-3xl flex-wrap justify-center gap-x-5 gap-y-2 text-xs text-white/75">
+          <Link to="/privacy" className="hover:text-gold">Поверителност</Link>
+          <Link to="/cookies" className="hover:text-gold">Бисквитки</Link>
+          <Link to="/terms" className="hover:text-gold">Общи условия</Link>
+          <Link to="/data-request" className="hover:text-gold">Права върху личните данни</Link>
+          <button type="button" onClick={openCookiePreferences} className="hover:text-gold">Настройки на бисквитките</button>
+        </nav>
+        <p className="mx-auto max-w-[15rem] text-center text-xs leading-relaxed text-white/70 sm:max-w-md">{copyright}</p>
       </div>
     </footer>
   );

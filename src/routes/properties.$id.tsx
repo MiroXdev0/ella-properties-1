@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { properties as demoProperties } from "@/data/properties";
 import { useSiteSettings } from "@/hooks/use-site-settings";
 import { isVideoUrl, embedUrl } from "@/lib/media";
+import { ConsentEmbed } from "@/components/consent/ConsentEmbed";
 
 type Media = { url: string; kind: "image" | "video" };
 
@@ -300,6 +301,7 @@ function PropertyDetail() {
                   {isVideoUrl(p.videoEmbed) ? (
                     <video src={p.videoEmbed} controls className="h-full w-full" />
                   ) : (
+                    <ConsentEmbed service="YouTube / Vimeo" fallbackHref={p.videoEmbed}>
                     <iframe
                       src={p.videoEmbed}
                       title="Видео на имота"
@@ -307,6 +309,7 @@ function PropertyDetail() {
                       allowFullScreen
                       className="h-full w-full"
                     />
+                    </ConsentEmbed>
                   )}
                 </div>
               </>
@@ -316,12 +319,14 @@ function PropertyDetail() {
               <>
                 <h2 className="mt-8 font-display text-xl text-navy">Местоположение</h2>
                 <div className="mt-3 aspect-[16/9] overflow-hidden rounded-2xl border border-border">
+                  <ConsentEmbed service="Google Maps" fallbackHref={`https://www.google.com/maps?q=${p.mapLat},${p.mapLng}`}>
                   <iframe
                     title="Карта на имота"
                     loading="lazy"
                     className="h-full w-full"
                     src={`https://www.google.com/maps?q=${p.mapLat},${p.mapLng}&z=15&output=embed`}
                   />
+                  </ConsentEmbed>
                 </div>
               </>
             )}
