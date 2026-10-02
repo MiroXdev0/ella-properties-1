@@ -48,3 +48,9 @@ function TermsPage() {
     </LegalLayout>
   );
 }
+
+
+
+
+
+

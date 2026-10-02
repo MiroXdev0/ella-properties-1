@@ -128,3 +128,8 @@ export async function fetchStats() {
     newInquiries: inquiries.count ?? 0,
   };
 }
+
+
+
+
+

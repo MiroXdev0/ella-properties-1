@@ -57,3 +57,9 @@ export function legalHead(title: string, description: string) {
     ],
   };
 }
+
+
+
+
+
+

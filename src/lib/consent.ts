@@ -50,3 +50,9 @@ export function useConsent() {
   }, []);
   return { consent, ready };
 }
+
+
+
+
+
+

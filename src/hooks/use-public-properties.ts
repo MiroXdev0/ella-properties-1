@@ -47,3 +47,9 @@ export function usePublicProperties() {
   const list = data && data.length > 0 ? data : demoProperties;
   return { properties: list, isLoading, hasReal: !!data && data.length > 0 };
 }
+
+
+
+
+
+
