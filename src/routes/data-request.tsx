@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { LegalLayout, legalHead } from "@/components/legal/LegalLayout";
+import { LegalLayout } from "@/components/legal/LegalLayout";
+import { legalHead } from "@/lib/seo";
 import { submitDataRequest, DATA_REQUEST_TYPES } from "@/lib/inquiries.functions";
 
 export const Route = createFileRoute("/data-request")({
@@ -14,6 +15,7 @@ export const Route = createFileRoute("/data-request")({
     legalHead(
       "Права върху личните данни — Елла Недвижими Имоти",
       "Подайте искане за достъп, корекция, изтриване, преносимост на личните данни или оттегляне на съгласие.",
+      "/data-request",
     ),
   component: DataRequestPage,
 });
@@ -64,7 +66,7 @@ function DataRequestPage() {
 
       <div aria-live="polite">
         {status === "done" && <p className="rounded-lg border border-border bg-muted p-4">Искането е получено. Ще се свържем с Вас на посочения имейл.</p>}
-        {status === "error" && <p className="text-destructive">Възникна грешка. Моля, опитайте отново или пишете на [ИМЕЙЛ].</p>}
+        {status === "error" && <p className="text-destructive">Възникна грешка. Моля, опитайте отново или се свържете с нас по телефона.</p>}
         {status === "rate" && <p className="text-destructive">Твърде много искания. Моля, опитайте по-късно.</p>}
       </div>
 
@@ -111,8 +113,6 @@ function DataRequestPage() {
     </LegalLayout>
   );
 }
-
-
 
 
 

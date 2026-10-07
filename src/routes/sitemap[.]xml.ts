@@ -1,75 +1,97 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type {} from "@tanstack/react-start";
 
-const BASE_URL = "https://ellaimoti.lovable.app";
+import { supabase } from "@/integrations/supabase/client";
+import { SITE_URL } from "@/lib/seo";
 
 interface SitemapEntry {
   path: string;
-  changefreq?: "always" | "hourly" | "daily" | "weekly" | "monthly" | "yearly" | "never";
-  priority?: string;
   lastmod?: string;
 }
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const PAGE_SIZE = 1000;
+
 async function publishedPropertyEntries(): Promise<SitemapEntry[]> {
-  try {
-    const url = process.env["SUPABASE_URL"];
-    const key = process.env["SUPABASE_PUBLISHABLE_KEY"];
-    if (!url || !key) return [];
-    const res = await fetch(
-      `${url}/rest/v1/properties?select=id,updated_at&is_published=eq.true&order=created_at.desc&limit=500`,
-      { headers: { apikey: key, accept: "application/json" } },
-    );
-    if (!res.ok) return [];
-    const rows = (await res.json()) as { id: string; updated_at?: string | null }[];
-    return rows.map((r) => ({
-      path: `/properties/${r.id}`,
-      changefreq: "weekly" as const,
-      priority: "0.8",
-      lastmod: r.updated_at ? new Date(r.updated_at).toISOString().slice(0, 10) : undefined,
-    }));
-  } catch {
-    return [];
+  const entries: SitemapEntry[] = [];
+  let offset = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("properties")
+      .select("id,updated_at")
+      .eq("is_published", true)
+      .order("created_at", { ascending: false })
+      .range(offset, offset + PAGE_SIZE - 1);
+
+    if (error) throw error;
+
+    for (const property of data ?? []) {
+      if (!UUID_PATTERN.test(property.id)) continue;
+      const date = property.updated_at ? new Date(property.updated_at) : null;
+      entries.push({
+        path: `/properties/${encodeURIComponent(property.id)}`,
+        ...(date && !Number.isNaN(date.valueOf()) ? { lastmod: date.toISOString().slice(0, 10) } : {}),
+      });
+    }
+
+    if (!data || data.length < PAGE_SIZE) break;
+    offset += data.length;
   }
+
+  return entries;
+}
+
+function escapeXml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&apos;");
 }
 
 export const Route = createFileRoute("/sitemap.xml")({
   server: {
     handlers: {
       GET: async () => {
-        const entries: SitemapEntry[] = [
-          { path: "/", changefreq: "weekly", priority: "1.0" },
-          ...(await publishedPropertyEntries()),
-        ];
+        try {
+          const entries: SitemapEntry[] = [
+            { path: "/" },
+            ...(await publishedPropertyEntries()),
+          ];
+          const uniqueEntries = [...new Map(entries.map((entry) => [entry.path, entry])).values()];
+          const urls = uniqueEntries.map((entry) =>
+            [
+              "  <url>",
+              `    <loc>${escapeXml(`${SITE_URL}${entry.path}`)}</loc>`,
+              entry.lastmod ? `    <lastmod>${entry.lastmod}</lastmod>` : null,
+              "  </url>",
+            ]
+              .filter(Boolean)
+              .join("\n"),
+          );
+          const xml = [
+            '<?xml version="1.0" encoding="UTF-8"?>',
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+            ...urls,
+            "</urlset>",
+          ].join("\n");
 
-        const urls = entries.map((e) =>
-          [
-            `  <url>`,
-            `    <loc>${BASE_URL}${e.path}</loc>`,
-            e.lastmod ? `    <lastmod>${e.lastmod}</lastmod>` : null,
-            e.changefreq ? `    <changefreq>${e.changefreq}</changefreq>` : null,
-            e.priority ? `    <priority>${e.priority}</priority>` : null,
-            `  </url>`,
-          ]
-            .filter(Boolean)
-            .join("\n"),
-        );
-
-        const xml = [
-          `<?xml version="1.0" encoding="UTF-8"?>`,
-          `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`,
-          ...urls,
-          `</urlset>`,
-        ].join("\n");
-
-        return new Response(xml, {
-          headers: {
-            "Content-Type": "application/xml",
-            "Cache-Control": "public, max-age=3600",
-          },
-        });
+          return new Response(xml, {
+            headers: {
+              "Content-Type": "application/xml; charset=utf-8",
+              "Cache-Control": "public, max-age=3600",
+            },
+          });
+        } catch (error) {
+          console.error("Unable to generate sitemap.xml", error);
+          return new Response("Sitemap temporarily unavailable", {
+            status: 503,
+            headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
+          });
+        }
       },
     },
   },
 });
-
-

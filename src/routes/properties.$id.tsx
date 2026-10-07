@@ -13,10 +13,10 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { properties as demoProperties } from "@/data/properties";
 import { useSiteSettings } from "@/hooks/use-site-settings";
 import { isVideoUrl, embedUrl } from "@/lib/media";
 import { ConsentEmbed } from "@/components/consent/ConsentEmbed";
+import { SITE_URL } from "@/lib/seo";
 
 type Media = { url: string; kind: "image" | "video" };
 
@@ -46,24 +46,7 @@ const isUuid = (v: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 
 async function loadProperty(id: string): Promise<Detail> {
-  if (!isUuid(id)) {
-    const demo = demoProperties.find((p) => p.id === id);
-    if (!demo) throw notFound();
-    return {
-      id: demo.id,
-      title: demo.title,
-      type: demo.type,
-      listing: demo.listing,
-      price: demo.price,
-      city: demo.city,
-      district: demo.district,
-      area: demo.area,
-      layout: demo.layout ?? null,
-      floor: demo.floor ?? null,
-      description: demo.description,
-      media: [{ url: demo.image, kind: "image" }],
-    };
-  }
+  if (!isUuid(id)) throw notFound();
 
   const { data, error } = await supabase
     .from("properties")
@@ -92,7 +75,7 @@ async function loadProperty(id: string): Promise<Detail> {
     type: String(data.type),
     listing: data.status === "Под наем" || data.status === "Отдаден" ? "Наем" : "Продажба",
     price: Number(data.price ?? 0),
-    city: data.city ?? "Перник",
+    city: data.city ?? "",
     district: data.district ?? "",
     address: data.address ?? undefined,
     area: Number(data.area ?? 0),
@@ -109,8 +92,6 @@ async function loadProperty(id: string): Promise<Detail> {
   };
 }
 
-const SITE = "https://ellaimoti.lovable.app";
-
 export const Route = createFileRoute("/properties/$id")({
   loader: ({ params }) => loadProperty(params.id),
   head: ({ params, loaderData }) => {
@@ -118,17 +99,25 @@ export const Route = createFileRoute("/properties/$id")({
       return {
         meta: [
           { title: "Имотът не е намерен | Елла Недвижими Имоти" },
-          { name: "robots", content: "noindex" },
+          { name: "robots", content: "noindex,follow" },
         ],
       };
     }
-    const url = `${SITE}/properties/${params.id}`;
-    const title = (loaderData.seoTitle || `${loaderData.title} — ${loaderData.city}`).slice(0, 60);
+    const url = `${SITE_URL}/properties/${encodeURIComponent(params.id)}`;
+    const image = loaderData.media.find((item) => item.kind === "image")?.url;
+    const imageUrl = image ? new URL(image, SITE_URL).href : undefined;
+    const title = (loaderData.seoTitle || `${loaderData.title} — ${loaderData.city}`)
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 60);
     const desc = (
       loaderData.seoDescription ||
       loaderData.description ||
       `${loaderData.type} в ${loaderData.city}, ${loaderData.district}. ${loaderData.area} м².`
-    ).slice(0, 158);
+    )
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 158);
     return {
       meta: [
         { title },
@@ -137,7 +126,12 @@ export const Route = createFileRoute("/properties/$id")({
         { property: "og:description", content: desc },
         { property: "og:type", content: "article" },
         { property: "og:url", content: url },
-        { name: "twitter:card", content: "summary_large_image" },
+        ...(imageUrl ? [{ property: "og:image", content: imageUrl }] : []),
+        ...(imageUrl ? [{ property: "og:image:alt", content: title }] : []),
+        { name: "twitter:title", content: title },
+        { name: "twitter:description", content: desc },
+        ...(imageUrl ? [{ name: "twitter:image", content: imageUrl }] : []),
+        { name: "twitter:card", content: imageUrl ? "summary_large_image" : "summary" },
       ],
       links: [{ rel: "canonical", href: url }],
       scripts: [
@@ -149,6 +143,7 @@ export const Route = createFileRoute("/properties/$id")({
             name: loaderData.title,
             description: desc,
             url,
+            ...(imageUrl ? { image: imageUrl } : {}),
             floorSize: { "@type": "QuantitativeValue", value: loaderData.area, unitCode: "MTK" },
             offers: {
               "@type": "Offer",
@@ -382,9 +377,4 @@ function Spec({
     </div>
   );
 }
-
-
-
-
-
 

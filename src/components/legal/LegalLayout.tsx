@@ -24,9 +24,8 @@ export function LegalLayout({ title, updated, children }: { title: string; updat
           role="note"
           className="mt-6 rounded-lg border border-border bg-muted p-4 text-sm text-foreground"
         >
-          <strong>Шаблон.</strong> Този документ е изготвен според текущата функционалност на сайта и
-          трябва да бъде прегледан от квалифициран юрист преди да се разчита на него. Полетата в
-          [КВАДРАТНИ СКОБИ] трябва да се попълнят от собственика на сайта.
+          За въпроси относно тази информация се свържете с Елла Недвижими Имоти по телефоните,
+          посочени на началната страница.
         </div>
         <div className="legal-prose mt-8 space-y-4 text-[15px] leading-relaxed [&_h2]:mt-8 [&_h2]:font-display [&_h2]:text-2xl [&_h2]:text-navy [&_h3]:mt-5 [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_a]:underline [&_table]:w-full [&_td]:border [&_td]:border-border [&_td]:p-2 [&_th]:border [&_th]:border-border [&_th]:p-2 [&_th]:text-left">
           {children}
@@ -44,22 +43,6 @@ export function LegalLayout({ title, updated, children }: { title: string; updat
     </div>
   );
 }
-
-export function legalHead(title: string, description: string) {
-  return {
-    meta: [
-      { title },
-      { name: "description", content: description },
-      { property: "og:title", content: title },
-      { property: "og:description", content: description },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-    ],
-  };
-}
-
-
-
 
 
 

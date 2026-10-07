@@ -42,14 +42,20 @@ import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 
 import heroImage from "@/assets/hero.jpg";
-import { properties, type PropertyType, APARTMENT_LAYOUTS } from "@/data/properties";
-import { usePublicProperties } from "@/hooks/use-public-properties";
+import { type Property, type PropertyType, APARTMENT_LAYOUTS } from "@/data/properties";
+import { fetchPublicProperties, usePublicProperties } from "@/hooks/use-public-properties";
 import { useServerFn } from "@tanstack/react-start";
+import { SITE_URL } from "@/lib/seo";
 
 import { submitInquiry } from "@/lib/inquiries.functions";
 import { ConsentEmbed } from "@/components/consent/ConsentEmbed";
 import { openCookiePreferences } from "@/lib/consent";
-import { useSiteSettings, type PublicSettings } from "@/hooks/use-site-settings";
+import {
+  fetchPublicSettings,
+  useSiteSettings,
+  DEFAULT_SETTINGS,
+  type PublicSettings,
+} from "@/hooks/use-site-settings";
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   Home: HomeIcon, Key, Building2, FileText, Award, Shield, Users, TrendingUp,
@@ -62,44 +68,64 @@ const waHref = (n?: string) =>
   `https://wa.me/${(n ?? "").replace(/[^0-9]/g, "")}`;
 const viberHref = (n?: string) =>
   `viber://chat?number=%2B${(n ?? "").replace(/[^0-9]/g, "")}`;
+const displayBrandName = (name?: string | null) =>
+  (name?.trim() || "Елла Недвижими Имоти").replace(/Елла(?=Недвижими)/u, "Елла ");
+
+function publicLogoUrl(value?: string | null): string | null {
+  if (!value) return null;
+  const absoluteUrl = /^https?:\/\/\S+$/i.test(value);
+  const sitePath = value.startsWith("/") && !value.startsWith("//");
+  const path = value.replace(/^https?:\/\/[^/]+/i, "").split(/[?#]/, 1)[0] ?? "";
+  if ((!absoluteUrl && !sitePath) || path.startsWith("/__l5e/")) return null;
+  return value;
+}
 
 export const Route = createFileRoute("/")({
-  head: () => ({
-    meta: [
-      { title: "Елла Недвижими Имоти — Имоти в Перник и София" },
+  loader: async () => {
+    const [properties, settings] = await Promise.all([
+      fetchPublicProperties(),
+      fetchPublicSettings(),
+    ]);
+    return { properties, settings };
+  },
+  head: ({ loaderData }) => {
+    const settings = loaderData?.settings ?? DEFAULT_SETTINGS;
+    const title = settings.seo_home_title || DEFAULT_SETTINGS.seo_home_title;
+    const description = settings.seo_home_description || DEFAULT_SETTINGS.seo_home_description;
+    return {
+      meta: [
+      { title },
       {
         name: "description",
-        content:
-          "Агенция за недвижими имоти в област Перник и София — покупка, продажба и наем на апартаменти, къщи, парцели и бизнес имоти.",
+        content: description,
       },
-      { name: "keywords", content: "Недвижими имоти Перник, недвижими имоти София, апартаменти Перник, къщи Перник, имоти област Перник, агенция недвижими имоти Перник и София" },
-      { property: "og:title", content: "Елла Недвижими Имоти — Имоти в Перник и София" },
-      {
-        property: "og:description",
-        content:
-          "Разгледайте актуални апартаменти, къщи и парцели в Перник и София — с реални снимки, цени и лично съдействие от брокерите на Елла.",
-      },
-      { property: "og:url", content: "/" },
+      { property: "og:title", content: title },
+      { property: "og:description", content: description },
+      { property: "og:url", content: `${SITE_URL}/` },
+      { property: "og:image", content: new URL(heroImage, SITE_URL).href },
+      { property: "og:image:alt", content: "Светъл модерен интериор с панорамни прозорци" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: title },
+      { name: "twitter:description", content: description },
+      { name: "twitter:image", content: new URL(heroImage, SITE_URL).href },
+      { name: "twitter:image:alt", content: "Светъл модерен интериор с панорамни прозорци" },
     ],
-    links: [{ rel: "canonical", href: "/" }],
+    links: [{ rel: "canonical", href: `${SITE_URL}/` }],
     scripts: [
       {
         type: "application/ld+json",
         children: JSON.stringify({
           "@context": "https://schema.org",
           "@type": "RealEstateAgent",
-          name: "Елла Недвижими Имоти",
-          url: "https://ellaimoti.lovable.app/",
-          telephone: ["+359884816232", "+359884388022"],
-          email: "office@ella-imoti.bg",
-          areaServed: ["Перник", "София"],
-          address: {
+          name: settings.brand_name,
+          url: `${SITE_URL}/`,
+          telephone: [settings.phone1, settings.phone2].filter(Boolean),
+          image: new URL(heroImage, SITE_URL).href,
+          ...(settings.address ? { address: {
             "@type": "PostalAddress",
-            streetAddress: "ул. „Райко Даскалов“ 4",
-            addressLocality: "Перник",
-            postalCode: "2300",
+            streetAddress: settings.address,
             addressCountry: "BG",
-          },
+          } } : {}),
         }),
       },
       {
@@ -107,17 +133,19 @@ export const Route = createFileRoute("/")({
         children: JSON.stringify({
           "@context": "https://schema.org",
           "@type": "WebSite",
-          name: "Елла Недвижими Имоти",
-          url: "https://ellaimoti.lovable.app/",
+          name: settings.brand_name,
+          url: `${SITE_URL}/`,
         }),
       },
     ],
-  }),
+    };
+  },
   component: HomePage,
 });
 
 function HomePage() {
-  const settings = useSiteSettings();
+  const { properties, settings: initialSettings } = Route.useLoaderData();
+  const settings = useSiteSettings(initialSettings);
   return (
     <div className="min-h-screen bg-background font-sans text-foreground antialiased">
       <BrandStyle primary={settings.primary_color} accent={settings.accent_color} />
@@ -132,7 +160,7 @@ function HomePage() {
         <Hero settings={settings} />
         <About settings={settings} />
         <Services settings={settings} />
-        <Catalog settings={settings} />
+        <Catalog settings={settings} initialProperties={properties} />
         <WhyUs settings={settings} />
         <Testimonials settings={settings} />
         <Contact settings={settings} />
@@ -229,36 +257,18 @@ function Header({ settings }: { settings: PublicSettings }) {
 }
 
 function Logo({ settings }: { settings: PublicSettings }) {
-  const name = settings.brand_name || "Елла Недвижими Имоти";
-  const first = name.split(" ")[0];
-  const rest = name.split(" ").slice(1).join(" ");
-  const NameText = (
-    <span className="min-w-0 truncate font-display text-xl font-semibold leading-none tracking-tight text-navy sm:text-2xl lg:text-[1.45rem] xl:text-[1.65rem]">
-      <span className="text-blue-600">{first}</span>
-      {rest && <span className="ml-1.5">{rest}</span>}
-    </span>
-  );
-  if (settings.logo_url) {
-    return (
-      <span className="flex min-w-0 items-center gap-3">
-        <span className="shrink-0 overflow-hidden rounded-lg">
-          <img
-            src={settings.logo_url}
-            alt={name}
-            className="h-14 w-auto scale-110 object-cover lg:h-16"
-          />
-        </span>
-        {NameText}
-      </span>
-    );
-  }
-  const letter = name.trim().charAt(0);
+  const name = displayBrandName(settings.brand_name);
+  const logoUrl = publicLogoUrl(settings.logo_url) ?? "/ella-imoti-logo.png";
   return (
-    <span className="flex min-w-0 items-center gap-3">
-      <span className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-navy text-gold ring-2 ring-gold/40 shadow-sm lg:h-16 lg:w-16">
-        <span className="font-display text-2xl font-semibold leading-none lg:text-3xl">{letter}</span>
-      </span>
-      {NameText}
+    <span className="flex min-w-0 items-center">
+      <img
+        src={logoUrl}
+        alt={name}
+        width={588}
+        height={280}
+        fetchPriority="high"
+        className="h-14 w-auto max-w-full object-contain sm:h-16"
+      />
     </span>
   );
 }
@@ -270,13 +280,17 @@ function Hero({ settings }: { settings: PublicSettings }) {
     { k: settings.stat1_value, v: settings.stat1_label },
     { k: settings.stat2_value, v: settings.stat2_label },
     { k: settings.stat3_value, v: settings.stat3_label },
-  ];
+  ].filter((stat) => stat.k && stat.v);
   return (
     <section id="top" className="relative isolate overflow-hidden">
       <div className="relative">
         <img
           src={settings.hero_image_url || heroImage}
-          alt=""
+          alt={
+            settings.hero_image_url
+              ? "Изображение на недвижим имот"
+              : "Светъл модерен интериор с панорамни прозорци"
+          }
           width={1920}
           height={1280}
           fetchPriority="high"
@@ -318,16 +332,18 @@ function Hero({ settings }: { settings: PublicSettings }) {
                   </a>
                 </Button>
               </div>
-              <dl className="mt-8 grid max-w-lg grid-cols-3 gap-4 border-t border-white/15 pt-6 text-white sm:mt-12 sm:gap-6 sm:pt-8">
-                {stats.map((s) => (
-                  <div key={s.v}>
-                    <dt className="font-display text-2xl text-gold sm:text-3xl">{s.k}</dt>
-                    <dd className="mt-1 text-[10px] uppercase leading-tight tracking-[0.12em] text-white/65 sm:text-xs sm:tracking-[0.15em]">
-                      {s.v}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
+              {stats.length > 0 && (
+                <dl className="mt-8 grid max-w-lg grid-cols-3 gap-4 border-t border-white/15 pt-6 text-white sm:mt-12 sm:gap-6 sm:pt-8">
+                  {stats.map((s) => (
+                    <div key={s.v}>
+                      <dt className="font-display text-2xl text-gold sm:text-3xl">{s.k}</dt>
+                      <dd className="mt-1 text-[10px] uppercase leading-tight tracking-[0.12em] text-white/65 sm:text-xs sm:tracking-[0.15em]">
+                        {s.v}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
             </div>
           </div>
         </div>
@@ -339,9 +355,16 @@ function Hero({ settings }: { settings: PublicSettings }) {
 /* ---------------- About ---------------- */
 
 function About({ settings }: { settings: PublicSettings }) {
+  const stats = [
+    { k: settings.stat1_value, v: settings.stat1_label },
+    { k: settings.stat2_value, v: settings.stat2_label },
+    { k: settings.stat3_value, v: settings.stat3_label },
+    { k: settings.about_stat4_value, v: settings.about_stat4_label },
+  ].filter((stat) => stat.k && stat.v);
+
   return (
     <section id="about" className="bg-background py-16 sm:py-20 lg:py-32">
-      <div className="mx-auto grid max-w-7xl gap-10 px-4 sm:gap-14 sm:px-5 lg:grid-cols-2 lg:gap-20 lg:px-8">
+      <div className={`mx-auto grid max-w-7xl gap-10 px-4 sm:gap-14 sm:px-5 lg:gap-20 lg:px-8 ${stats.length > 0 ? "lg:grid-cols-2" : ""}`}>
         <div>
           <SectionEyebrow>За нас</SectionEyebrow>
           <h2 className="mt-4 font-display text-3xl font-medium text-navy sm:text-4xl md:text-5xl">
@@ -356,15 +379,11 @@ function About({ settings }: { settings: PublicSettings }) {
             </p>
           )}
         </div>
-        <div className="grid grid-cols-2 gap-4 sm:gap-5">
-          {[
-            { k: settings.stat1_value, v: settings.stat1_label },
-            { k: settings.stat2_value, v: settings.stat2_label },
-            { k: settings.stat3_value, v: settings.stat3_label },
-            { k: "Пълно", v: "съдействие" },
-          ].map((c) => (
+        {stats.length > 0 && (
+          <div className="grid grid-cols-2 gap-4 sm:gap-5">
+          {stats.map((c) => (
             <div
-              key={c.k}
+              key={`${c.k}-${c.v}`}
               className="rounded-2xl border border-border bg-card p-6 shadow-sm transition-shadow hover:shadow-md"
             >
               <div className="font-display text-3xl text-navy">{c.k}</div>
@@ -373,7 +392,8 @@ function About({ settings }: { settings: PublicSettings }) {
               </div>
             </div>
           ))}
-        </div>
+          </div>
+        )}
       </div>
     </section>
   );
@@ -382,7 +402,7 @@ function About({ settings }: { settings: PublicSettings }) {
 /* ---------------- Services ---------------- */
 
 function Services({ settings }: { settings: PublicSettings }) {
-  const services = settings.services ?? [];
+  const services = (settings.services ?? []).filter((service) => service.title.trim());
   return (
     <section id="services" className="bg-muted/50 py-16 sm:py-20 lg:py-32">
       <div className="mx-auto max-w-7xl px-4 sm:px-5 lg:px-8">
@@ -436,14 +456,14 @@ const PROPERTY_TYPES: (PropertyType | "Всички")[] = [
   "Бизнес имот",
 ];
 
-function Catalog({ settings }: { settings: PublicSettings }) {
+function Catalog({ settings, initialProperties }: { settings: PublicSettings; initialProperties: Property[] }) {
   const [type, setType] = useState<string>("Всички");
   const [listing, setListing] = useState<string>("Всички");
   const [district, setDistrict] = useState<string>("Всички");
   const [layout, setLayout] = useState<string>("Всички");
   const [maxPrice, setMaxPrice] = useState<string>("");
   const [minArea, setMinArea] = useState<string>("");
-  const { properties: list, isLoading } = usePublicProperties();
+  const { properties: list, isLoading } = usePublicProperties(initialProperties);
 
   const districts = useMemo(
     () => ["Всички", ...Array.from(new Set(list.map((p) => p.district).filter(Boolean)))],
@@ -591,19 +611,24 @@ function FilterSelect({
   );
 }
 
-function PropertyCard({ p }: { p: (typeof properties)[number] }) {
+function PropertyCard({ p }: { p: Property }) {
   const priceText = new Intl.NumberFormat("bg-BG").format(p.price);
   return (
     <article className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all hover:-translate-y-1 hover:shadow-xl">
       <div className="relative aspect-[4/3] overflow-hidden">
-        <img
-          src={p.image}
-          alt={p.title}
-          loading="lazy"
-          width={1024}
-          height={768}
-          className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-        />
+        {p.image ? (
+          <img
+            src={p.image}
+            alt={p.city ? `${p.title} в ${p.city}` : p.title}
+            loading="lazy"
+            decoding="async"
+            width={1024}
+            height={768}
+            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+          />
+        ) : (
+          <div className="h-full w-full bg-muted" aria-hidden="true" />
+        )}
         <span className="absolute left-4 top-4 rounded-full bg-navy/95 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-white backdrop-blur">
           {p.listing}
         </span>
@@ -616,7 +641,7 @@ function PropertyCard({ p }: { p: (typeof properties)[number] }) {
           <h3 className="font-display text-xl text-navy">{p.title}</h3>
         </div>
         <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
-          <MapPin className="h-3.5 w-3.5" /> {p.city}, {p.district}
+          <MapPin className="h-3.5 w-3.5" /> {p.city}{p.district ? `, ${p.district}` : ""}
         </p>
         <p className="mt-3 line-clamp-2 text-sm text-foreground/75">{p.description}</p>
         <div className="mt-5 flex flex-wrap gap-4 border-t border-border pt-4 text-xs text-muted-foreground">
@@ -705,7 +730,11 @@ function WhyUs({ settings }: { settings: PublicSettings }) {
 /* ---------------- Testimonials ---------------- */
 
 function Testimonials({ settings }: { settings: PublicSettings }) {
-  const items = settings.testimonials ?? [];
+  const items = (settings.testimonials ?? []).filter(
+    (testimonial) => testimonial.name.trim() && testimonial.text.trim(),
+  );
+  if (items.length === 0) return null;
+
   return (
     <section id="testimonials" className="bg-background py-16 sm:py-20 lg:py-32">
       <div className="mx-auto max-w-7xl px-4 sm:px-5 lg:px-8">
@@ -721,11 +750,6 @@ function Testimonials({ settings }: { settings: PublicSettings }) {
               key={t.name}
               className="flex flex-col rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8"
             >
-              <div className="flex gap-1 text-gold">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star key={i} className="h-4 w-4 fill-current" />
-                ))}
-              </div>
               <blockquote className="mt-5 flex-1 text-base leading-relaxed text-foreground/80">
                 „{t.text}"
               </blockquote>
@@ -818,11 +842,13 @@ function Contact({ settings }: { settings: PublicSettings }) {
                 { text: settings.address, href: settings.contact_map_url || undefined },
               ]}
             />
-            <ContactRow
-              icon={Mail}
-              title="Имейл"
-              lines={[{ text: settings.email, href: `mailto:${settings.email}` }]}
-            />
+            {settings.email && (
+              <ContactRow
+                icon={Mail}
+                title="Имейл"
+                lines={[{ text: settings.email, href: `mailto:${settings.email}` }]}
+              />
+            )}
             {settings.contact_map_embed?.startsWith("https://") && (
             <div className="overflow-hidden rounded-2xl border border-border shadow-sm">
               <ConsentEmbed service="Google Maps" fallbackHref={settings.contact_map_url || undefined}>
@@ -976,32 +1002,21 @@ function ContactRow({
 
 function Footer({ settings }: { settings: PublicSettings }) {
   const nav = settings.nav_links ?? [];
+  const logoUrl = publicLogoUrl(settings.logo_url) ?? "/ella-imoti-logo.png";
+  const brandName = displayBrandName(settings.brand_name);
   const copyright = (settings.footer_copyright || "").replace("{year}", String(new Date().getFullYear()));
   return (
     <footer className="border-t border-border bg-navy-deep text-white/80">
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-5 sm:py-14 sm:grid-cols-2 lg:grid-cols-4 lg:px-8">
         <div>
-          <div className="flex items-center gap-3">
-            {settings.logo_url ? (
-              <span className="shrink-0 overflow-hidden rounded-lg">
-                <img
-                  src={settings.logo_url}
-                  alt={settings.brand_name || "Елла Недвижими Имоти"}
-                  className="h-16 w-auto scale-110 object-cover lg:h-20"
-                />
-              </span>
-            ) : (
-              <span className="grid h-16 w-16 place-items-center rounded-full bg-gold text-navy-deep ring-2 ring-gold/40 shadow-sm lg:h-20 lg:w-20">
-                <span className="font-display text-2xl font-semibold">{(settings.brand_name || "Е").charAt(0)}</span>
-              </span>
-            )}
-            <div>
-              <div className="font-display text-[1.35rem] font-semibold leading-[1.05] tracking-tight text-white">
-                <span className="text-blue-400">{(settings.brand_name || "Елла").split(" ")[0]}</span>
-                <span className="ml-1.5">{(settings.brand_name || "Елла Недвижими Имоти").split(" ").slice(1).join(" ")}</span>
-              </div>
-            </div>
-          </div>
+          <img
+            src={logoUrl}
+            alt={brandName}
+            width={588}
+            height={280}
+            loading="lazy"
+            className="h-16 w-auto max-w-full object-contain lg:h-20"
+          />
           <p className="mt-5 text-sm leading-relaxed text-white/65">
             {settings.footer_description}
           </p>
@@ -1128,9 +1143,3 @@ function SectionEyebrow({
     </span>
   );
 }
-
-
-
-
-
-

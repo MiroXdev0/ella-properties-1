@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "tanstack_start_ts",
+      "name": "ella-properties",
       "dependencies": {
         "@fontsource/cormorant-garamond": "^5.3.0",
         "@fontsource/jost": "^5.3.0",

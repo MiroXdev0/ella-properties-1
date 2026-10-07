@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { Button } from "@/components/ui/button";
-import { LegalLayout, legalHead } from "@/components/legal/LegalLayout";
+import { LegalLayout } from "@/components/legal/LegalLayout";
+import { legalHead } from "@/lib/seo";
 import { openCookiePreferences } from "@/lib/consent";
 
 export const Route = createFileRoute("/cookies")({
@@ -9,13 +10,14 @@ export const Route = createFileRoute("/cookies")({
     legalHead(
       "Политика за бисквитките — Елла Недвижими Имоти",
       "Какви бисквитки и локално съхранение използва сайтът на Елла Недвижими Имоти и как да промените избора си.",
+      "/cookies",
     ),
   component: CookiesPage,
 });
 
 function CookiesPage() {
   return (
-    <LegalLayout title="Политика за бисквитките" updated="[ДАТА]">
+    <LegalLayout title="Политика за бисквитките">
       <p>
         Сайтът не използва аналитични или рекламни бисквитки. Използваме само необходимо локално
         съхранение. Външно съдържание (карти и видеа) се зарежда единствено след Ваше съгласие.
@@ -45,9 +47,6 @@ function CookiesPage() {
     </LegalLayout>
   );
 }
-
-
-
 
 
 

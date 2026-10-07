@@ -17,7 +17,12 @@ import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/admin")({
-  head: () => ({ meta: [{ title: "Админ панел — Елла Недвижими Имоти" }] }),
+  head: () => ({
+    meta: [
+      { title: "Админ панел — Елла Недвижими Имоти" },
+      { name: "robots", content: "noindex,nofollow" },
+    ],
+  }),
   component: AdminLayout,
 });
 
@@ -144,7 +149,6 @@ function AdminLayout() {
     </div>
   );
 }
-
 
 
 

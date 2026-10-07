@@ -35,7 +35,7 @@ async function clientKey(): Promise<string> {
  * hourly rate limits and is the only path allowed to insert inquiries.
  */
 export const submitInquiry = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => inquirySchema.parse(data))
+  .validator((data: unknown) => inquirySchema.parse(data))
   .handler(async ({ data }) => {
     // Silently accept bot submissions without storing anything.
     if (data.website && data.website.trim() !== "") return { ok: true as const };
@@ -88,7 +88,7 @@ const dataRequestSchema = z.object({
 
 /** Data-subject request: stored in the admin inquiries inbox for manual, identity-verified handling. */
 export const submitDataRequest = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => dataRequestSchema.parse(data))
+  .validator((data: unknown) => dataRequestSchema.parse(data))
   .handler(async ({ data }) => {
     if (data.website && data.website.trim() !== "") return { ok: true as const };
     if (data.started_at && Date.now() - data.started_at < 2500) return { ok: true as const };
@@ -113,7 +113,6 @@ export const submitDataRequest = createServerFn({ method: "POST" })
     }
     return { ok: true as const };
   });
-
 
 
 

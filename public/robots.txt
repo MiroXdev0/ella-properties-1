@@ -1,7 +1,5 @@
 User-agent: *
 Allow: /
 Disallow: /admin
-Disallow: /auth
-Disallow: /reset-password
 
-Sitemap: https://ellaimoti.lovable.app/sitemap.xml
+Sitemap: https://ellaimoti.pages.dev/sitemap.xml

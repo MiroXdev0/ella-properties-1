@@ -1,21 +1,18 @@
 # Routes
 
-TanStack Start uses **file-based routing**. Every `.tsx` file in this directory
-defines a route. Do **not** create `src/pages/`, `src/routes/_app/index.tsx`, or
-`app/layout.tsx` — those are Next.js / Remix conventions. The only root layout
-is `src/routes/__root.tsx`.
-
-## Conventions
+TanStack Start uses file-based routing. Public page and endpoint routes in this project are:
 
 | File | URL |
 | --- | --- |
 | `index.tsx` | `/` |
-| `about.tsx` | `/about` |
-| `users/index.tsx` | `/users` |
-| `users/$id.tsx` | `/users/:id` (dynamic — bare `$`, no curly braces) |
-| `posts/{-$category}.tsx` | `/posts/:category?` (optional segment) |
-| `files/$.tsx` | `/files/*` (splat — read via `_splat` param, never `*`) |
-| `_layout.tsx` | layout route (renders children via `<Outlet />`) |
-| `__root.tsx` | app shell — wraps every page; preserve `<Outlet />` |
+| `properties.$id.tsx` | `/properties/:id` |
+| `privacy.tsx` | `/privacy` |
+| `cookies.tsx` | `/cookies` |
+| `terms.tsx` | `/terms` |
+| `data-request.tsx` | `/data-request` |
+| `auth.tsx` | `/auth` |
+| `reset-password.tsx` | `/reset-password` |
+| `sitemap[.]xml.ts` | `/sitemap.xml` |
+| `api/public/media.$.ts` | `/api/public/media/*` |
 
-`routeTree.gen.ts` is auto-generated. Don't edit it by hand.
+Staff pages are nested under `_authenticated/` and resolve beneath `/admin`. The route tree is generated; do not edit `src/routeTree.gen.ts` by hand.

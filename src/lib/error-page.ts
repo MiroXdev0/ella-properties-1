@@ -1,9 +1,9 @@
 export function renderErrorPage(): string {
   return `<!doctype html>
-<html lang="en">
+<html lang="bg">
   <head>
     <meta charset="utf-8" />
-    <title>This page didn't load</title>
+    <title>Страницата не се зареди</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
       body { font: 15px/1.5 system-ui, -apple-system, sans-serif; background: #fafafa; color: #111; display: grid; place-items: center; min-height: 100vh; margin: 0; padding: 1.5rem; }
@@ -18,18 +18,16 @@ export function renderErrorPage(): string {
   </head>
   <body>
     <div class="card">
-      <h1>This page didn't load</h1>
-      <p>Something went wrong on our end. You can try refreshing or head back home.</p>
+      <h1>Страницата не се зареди</h1>
+      <p>Възникна грешка. Опитайте отново или се върнете към началната страница.</p>
       <div class="actions">
-        <button class="primary" onclick="location.reload()">Try again</button>
-        <a class="secondary" href="/">Go home</a>
+        <button class="primary" onclick="location.reload()">Опитайте отново</button>
+        <a class="secondary" href="/">Към началната страница</a>
       </div>
     </div>
   </body>
 </html>`;
 }
-
-
 
 
 

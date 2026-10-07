@@ -30,7 +30,7 @@ function serverPublicClient() {
  * so hiding the form in the UI is never the only control.
  */
 export const publicSignUp = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => signUpSchema.parse(data))
+  .validator((data: unknown) => signUpSchema.parse(data))
   .handler(async ({ data }) => {
     const supabase = serverPublicClient();
 
@@ -56,7 +56,6 @@ export const publicSignUp = createServerFn({ method: "POST" })
     }
     return { ok: true as const };
   });
-
 
 
 

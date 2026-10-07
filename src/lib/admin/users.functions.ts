@@ -17,7 +17,7 @@ const updateNameSchema = z.object({
 
 export const createAccessUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => createUserSchema.parse(data))
+  .validator((data: unknown) => createUserSchema.parse(data))
   .handler(async ({ data, context }) => {
     // Verify caller is admin under RLS
     const { data: adminRow, error: roleErr } = await context.supabase
@@ -59,7 +59,7 @@ export const createAccessUser = createServerFn({ method: "POST" })
 
 export const updateUserName = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => updateNameSchema.parse(data))
+  .validator((data: unknown) => updateNameSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { data: adminRow, error: roleErr } = await context.supabase
       .from("user_roles")
@@ -77,7 +77,6 @@ export const updateUserName = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
-
 
 
 

@@ -123,7 +123,7 @@ function SettingsAdmin() {
 
         <Section title="Статистики">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Row label="Статистика 1 — стойност"><Input value={form.stat1_value ?? ""} onChange={(e) => set("stat1_value", e.target.value)} placeholder="15+" /></Row>
+            <Row label="Статистика 1 — стойност"><Input value={form.stat1_value ?? ""} onChange={(e) => set("stat1_value", e.target.value)} /></Row>
             <Row label="Статистика 1 — етикет"><Input value={form.stat1_label ?? ""} onChange={(e) => set("stat1_label", e.target.value)} placeholder="години опит" /></Row>
             <Row label="Статистика 2 — стойност"><Input value={form.stat2_value ?? ""} onChange={(e) => set("stat2_value", e.target.value)} /></Row>
             <Row label="Статистика 2 — етикет"><Input value={form.stat2_label ?? ""} onChange={(e) => set("stat2_label", e.target.value)} /></Row>
@@ -226,7 +226,7 @@ function SettingsAdmin() {
               </div>
             ))}
             <Button type="button" variant="outline" onClick={() =>
-              set("services", [...services, { icon: "Home", title: "Нова услуга", items: [] }] as never)
+              set("services", [...services, { icon: "Home", title: "", items: [] }] as never)
             }><Plus className="mr-2 h-4 w-4" />Добави услуга</Button>
           </div>
         </Section>
@@ -277,7 +277,7 @@ function SettingsAdmin() {
               </div>
             ))}
             <Button type="button" variant="outline" onClick={() =>
-              set("testimonials", [...testimonials, { name: "Ново име", role: "Клиент", text: "" }] as never)
+              set("testimonials", [...testimonials, { name: "", role: "", text: "" }] as never)
             }><Plus className="mr-2 h-4 w-4" />Добави отзив</Button>
           </div>
         </Section>
@@ -318,7 +318,6 @@ function SettingsAdmin() {
           <div className="grid gap-4">
             <Row label="Meta title"><Input value={form.seo_home_title ?? ""} onChange={(e) => set("seo_home_title", e.target.value)} /></Row>
             <Row label="Meta description"><Textarea rows={2} value={form.seo_home_description ?? ""} onChange={(e) => set("seo_home_description", e.target.value)} /></Row>
-            <Row label="Keywords"><Input value={form.seo_home_keywords ?? ""} onChange={(e) => set("seo_home_keywords", e.target.value)} /></Row>
           </div>
         </Section>
 
@@ -346,8 +345,6 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (<div><Label>{label}</Label><div className="mt-1.5">{children}</div></div>);
 }
-
-
 
 
 
