@@ -260,7 +260,7 @@ function Logo({ settings }: { settings: PublicSettings }) {
   const name = displayBrandName(settings.brand_name);
   const logoUrl = publicLogoUrl(settings.logo_url) ?? "/ella-imoti-logo.png";
   return (
-    <span className="flex min-w-0 items-center">
+    <span className="flex min-w-0 items-center gap-2 sm:gap-3">
       <img
         src={logoUrl}
         alt={name}
@@ -269,6 +269,14 @@ function Logo({ settings }: { settings: PublicSettings }) {
         fetchPriority="high"
         className="h-14 w-auto max-w-full object-contain sm:h-16"
       />
+      <span className="min-w-0 border-l-2 border-blue-700 pl-2 text-left sm:pl-3">
+        <span className="block font-sans text-base font-semibold leading-none tracking-tight text-blue-700 sm:text-lg">
+          {name.split(" ")[0]}
+        </span>
+        <span className="mt-1 block whitespace-nowrap font-sans text-[9px] font-medium uppercase leading-none tracking-[0.12em] text-black sm:text-[10px]">
+          {name.split(" ").slice(1).join(" ")}
+        </span>
+      </span>
     </span>
   );
 }
@@ -1009,14 +1017,24 @@ function Footer({ settings }: { settings: PublicSettings }) {
     <footer className="border-t border-border bg-navy-deep text-white/80">
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-5 sm:py-14 sm:grid-cols-2 lg:grid-cols-4 lg:px-8">
         <div>
-          <img
-            src={logoUrl}
-            alt={brandName}
-            width={588}
-            height={280}
-            loading="lazy"
-            className="h-16 w-auto max-w-full object-contain lg:h-20"
-          />
+          <div className="flex items-center gap-3">
+            <img
+              src={logoUrl}
+              alt=""
+              width={588}
+              height={280}
+              loading="lazy"
+              className="h-16 w-auto max-w-full object-contain lg:h-20"
+            />
+            <span className="border-l-2 border-blue-400 pl-3">
+              <span className="block font-sans text-base font-semibold leading-none tracking-tight text-blue-300 sm:text-lg">
+                {brandName.split(" ")[0]}
+              </span>
+              <span className="mt-1 block font-sans text-[9px] font-medium uppercase leading-none tracking-[0.12em] text-white sm:text-[10px]">
+                {brandName.split(" ").slice(1).join(" ")}
+              </span>
+            </span>
+          </div>
           <p className="mt-5 text-sm leading-relaxed text-white/65">
             {settings.footer_description}
           </p>
