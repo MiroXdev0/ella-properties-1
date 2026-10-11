@@ -180,6 +180,10 @@ export const en: Record<keyof typeof bg, string> = {
   "auth.signupDisabled": "Registration is disabled by an administrator.",
   "auth.signupError": "There was a problem creating your account.",
   "auth.welcome": "Welcome!",
+  "auth.noAdminRole":
+    "You signed in successfully, but this account has no admin or editor role. Ask the site owner to grant access.",
+  "auth.roleCheckFailed":
+    "We couldn't verify this account's access. Please try again.",
   "auth.genericError": "Something went wrong",
   "auth.invalidEmail": "Invalid email address",
   "auth.emailTooLong": "Email address is too long",

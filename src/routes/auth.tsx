@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Building2, Loader2, ArrowLeft } from "lucide-react";
@@ -55,11 +55,40 @@ function AuthPage() {
     password: z.string().min(6, t("auth.minPassword")).max(100, t("auth.passwordTooLong")),
   });
 
+  const openAdminForUser = useCallback(
+    async (userId: string, announceWelcome = false) => {
+      const { data: roles, error } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId);
+
+      if (error) {
+        console.error("[auth] Unable to verify account role", error.message);
+        const { error: signOutError } = await supabase.auth.signOut({ scope: "local" });
+        if (signOutError) console.error("[auth] Unable to clear unverified session", signOutError);
+        toast.error(t("auth.roleCheckFailed"));
+        return;
+      }
+
+      if (!roles?.some(({ role }) => role === "admin" || role === "editor")) {
+        const { error: signOutError } = await supabase.auth.signOut({ scope: "local" });
+        if (signOutError)
+          console.error("[auth] Unable to clear unauthorized session", signOutError);
+        toast.error(t("auth.noAdminRole"));
+        return;
+      }
+
+      if (announceWelcome) toast.success(t("auth.welcome"));
+      await navigate({ to: "/admin" });
+    },
+    [navigate, t],
+  );
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate({ to: "/admin" });
+      if (data.session) void openAdminForUser(data.session.user.id);
     });
-  }, [navigate]);
+  }, [openAdminForUser]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -79,13 +108,16 @@ function AuthPage() {
         toast.error(parsed.error.issues[0]?.message ?? "Невалидни данни");
         return;
       }
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: parsed.data.email,
         password: parsed.data.password,
       });
       if (error) throw error;
-      toast.success(t("auth.welcome"));
-      navigate({ to: "/admin" });
+      if (!data.user) {
+        toast.error(t("auth.genericError"));
+        return;
+      }
+      await openAdminForUser(data.user.id, true);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("auth.genericError"));
     } finally {
