@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as SignupRouteImport } from './routes/signup'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as DataRequestRouteImport } from './routes/data-request'
@@ -36,6 +37,11 @@ const TermsRoute = TermsRouteImport.update({
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
   path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
@@ -128,6 +134,7 @@ export interface FileRoutesByFullPath {
   '/data-request': typeof DataRequestRoute
   '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
@@ -147,6 +154,7 @@ export interface FileRoutesByTo {
   '/data-request': typeof DataRequestRoute
   '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
   '/properties/$id': typeof PropertiesIdRoute
@@ -167,6 +175,7 @@ export interface FileRoutesById {
   '/data-request': typeof DataRequestRoute
   '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
@@ -188,6 +197,7 @@ export interface FileRouteTypes {
     | '/data-request'
     | '/privacy'
     | '/reset-password'
+    | '/signup'
     | '/sitemap.xml'
     | '/terms'
     | '/admin'
@@ -207,6 +217,7 @@ export interface FileRouteTypes {
     | '/data-request'
     | '/privacy'
     | '/reset-password'
+    | '/signup'
     | '/sitemap.xml'
     | '/terms'
     | '/properties/$id'
@@ -226,6 +237,7 @@ export interface FileRouteTypes {
     | '/data-request'
     | '/privacy'
     | '/reset-password'
+    | '/signup'
     | '/sitemap.xml'
     | '/terms'
     | '/_authenticated/admin'
@@ -247,6 +259,7 @@ export interface RootRouteChildren {
   DataRequestRoute: typeof DataRequestRoute
   PrivacyRoute: typeof PrivacyRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  SignupRoute: typeof SignupRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TermsRoute: typeof TermsRoute
   PropertiesIdRoute: typeof PropertiesIdRoute
@@ -267,6 +280,13 @@ declare module '@tanstack/react-router' {
       path: '/sitemap.xml'
       fullPath: '/sitemap.xml'
       preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reset-password': {
@@ -424,6 +444,7 @@ const rootRouteChildren: RootRouteChildren = {
   DataRequestRoute: DataRequestRoute,
   PrivacyRoute: PrivacyRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  SignupRoute: SignupRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   TermsRoute: TermsRoute,
   PropertiesIdRoute: PropertiesIdRoute,

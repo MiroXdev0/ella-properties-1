@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { Building2, Loader2, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -10,8 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Toaster } from "@/components/ui/sonner";
-import { useSiteSettings } from "@/hooks/use-site-settings";
-import { publicSignUp } from "@/lib/auth.functions";
+import { getRegistrationEnabled } from "@/lib/auth.functions";
 import { SITE_URL } from "@/lib/seo";
 import { useLanguage } from "@/i18n/LanguageProvider";
 import { LanguageSwitcher } from "@/i18n/LanguageSwitcher";
@@ -38,10 +38,15 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
-  const settings = useSiteSettings();
   const { language, t } = useLanguage();
-  const signUp = useServerFn(publicSignUp);
-  const [mode, setMode] = useState<"login" | "signup" | "forgot">("login");
+  const fetchRegistrationEnabled = useServerFn(getRegistrationEnabled);
+  const { data: registrationEnabled } = useQuery({
+    queryKey: ["registration-enabled"],
+    queryFn: () => fetchRegistrationEnabled(),
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+  });
+  const [mode, setMode] = useState<"login" | "forgot">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -69,32 +74,6 @@ function AuthPage() {
         setMode("login");
         return;
       }
-      if (mode === "signup") {
-        const parsed = loginSchema.safeParse({ email, password });
-        if (!parsed.success) {
-          toast.error(parsed.error.issues[0]?.message ?? "Невалидни данни");
-          return;
-        }
-        // Server-side check of the registration switch; the hidden form is only cosmetic.
-        const res = await signUp({
-          data: {
-            email: parsed.data.email,
-            password: parsed.data.password,
-            redirectTo: window.location.origin,
-          },
-        });
-        if (!res.ok) {
-          toast.error(
-            res.reason === "disabled"
-              ? t("auth.signupDisabled")
-              : t("auth.signupError"),
-          );
-          return;
-        }
-        toast.success(t("auth.signupSuccess"));
-        setMode("login");
-        return;
-      }
       const parsed = loginSchema.safeParse({ email, password });
       if (!parsed.success) {
         toast.error(parsed.error.issues[0]?.message ?? "Невалидни данни");
@@ -118,8 +97,13 @@ function AuthPage() {
     <div lang={language} className="min-h-screen bg-navy-deep text-white">
       <Toaster position="top-center" />
       <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-5 py-10">
-        <div className="mb-4 flex justify-end"><LanguageSwitcher /></div>
-        <Link to="/" className="mb-8 inline-flex items-center gap-2 text-sm text-white/70 hover:text-gold">
+        <div className="mb-4 flex justify-end">
+          <LanguageSwitcher />
+        </div>
+        <Link
+          to="/"
+          className="mb-8 inline-flex items-center gap-2 text-sm text-white/70 hover:text-gold"
+        >
           <ArrowLeft className="h-4 w-4" /> {t("nav.backToSite")}
         </Link>
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur">
@@ -129,24 +113,26 @@ function AuthPage() {
             </div>
             <div>
               <div className="font-display text-2xl">{t("auth.adminPanel")}</div>
-              <div className="text-xs uppercase tracking-[0.2em] text-gold">Елла Недвижими Имоти</div>
+              <div className="text-xs uppercase tracking-[0.2em] text-gold">
+                Елла Недвижими Имоти
+              </div>
             </div>
           </div>
 
           <h1 className="font-display text-2xl">
             {mode === "login" && t("auth.loginTitle")}
-            {mode === "signup" && t("auth.signupTitle")}
             {mode === "forgot" && t("auth.forgotTitle")}
           </h1>
           <p className="mt-1 text-sm text-white/60">
             {mode === "login" && t("auth.loginDescription")}
-            {mode === "signup" && t("auth.signupDescription")}
             {mode === "forgot" && t("auth.forgotDescription")}
           </p>
 
           <form onSubmit={onSubmit} className="mt-6 space-y-4">
             <div>
-              <Label htmlFor="email" className="text-white/80">{t("auth.email")}</Label>
+              <Label htmlFor="email" className="text-white/80">
+                {t("auth.email")}
+              </Label>
               <Input
                 id="email"
                 type="email"
@@ -159,11 +145,13 @@ function AuthPage() {
             </div>
             {mode !== "forgot" && (
               <div>
-                <Label htmlFor="password" className="text-white/80">{t("auth.password")}</Label>
+                <Label htmlFor="password" className="text-white/80">
+                  {t("auth.password")}
+                </Label>
                 <Input
                   id="password"
                   type="password"
-                  autoComplete={mode === "login" ? "current-password" : "new-password"}
+                  autoComplete="current-password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -178,7 +166,6 @@ function AuthPage() {
             >
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {mode === "login" && t("auth.login")}
-              {mode === "signup" && t("auth.signup")}
               {mode === "forgot" && t("auth.sendLink")}
             </Button>
           </form>
@@ -186,18 +173,24 @@ function AuthPage() {
           <div className="mt-6 flex flex-col gap-2 text-sm">
             {mode === "login" && (
               <>
-                <button onClick={() => setMode("forgot")} className="text-left text-white/70 hover:text-gold">
+                <button
+                  onClick={() => setMode("forgot")}
+                  className="text-left text-white/70 hover:text-gold"
+                >
                   {t("auth.forgot")}
                 </button>
-                {settings.allow_registration && (
-                  <button onClick={() => setMode("signup")} className="text-left text-white/70 hover:text-gold">
+                {registrationEnabled === true && (
+                  <Link to="/signup" className="text-left text-white/70 hover:text-gold">
                     {t("auth.noAccount")}
-                  </button>
+                  </Link>
                 )}
               </>
             )}
             {mode !== "login" && (
-              <button onClick={() => setMode("login")} className="text-left text-white/70 hover:text-gold">
+              <button
+                onClick={() => setMode("login")}
+                className="text-left text-white/70 hover:text-gold"
+              >
                 {t("auth.backToLogin")}
               </button>
             )}

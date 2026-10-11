@@ -3,11 +3,11 @@ import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 import type { Database } from "@/integrations/supabase/types";
+import { SITE_URL } from "@/lib/seo";
 
 const signUpSchema = z.object({
   email: z.string().trim().email().max(255),
   password: z.string().min(8).max(100),
-  redirectTo: z.string().url().max(500).optional(),
 });
 
 function serverPublicClient() {
@@ -17,7 +17,8 @@ function serverPublicClient() {
     global: {
       fetch: (input, init) => {
         const h = new Headers(init?.headers);
-        if (key.startsWith("sb_") && h.get("Authorization") === `Bearer ${key}`) h.delete("Authorization");
+        if (key.startsWith("sb_") && h.get("Authorization") === `Bearer ${key}`)
+          h.delete("Authorization");
         h.set("apikey", key);
         return fetch(input, { ...init, headers: h });
       },
@@ -25,39 +26,60 @@ function serverPublicClient() {
   });
 }
 
+export const getRegistrationEnabled = createServerFn({ method: "GET" }).handler(async () => {
+  const supabase = serverPublicClient();
+  const { data, error } = await supabase
+    .from("site_settings")
+    .select("allow_registration")
+    .eq("id", 1)
+    .maybeSingle();
+
+  if (error) {
+    console.error("[getRegistrationEnabled]", error.message);
+    throw new Error("Unable to verify registration availability");
+  }
+
+  return data?.allow_registration === true;
+});
+
 /**
  * Public sign-up. The `allow_registration` switch is enforced here on the server,
- * so hiding the form in the UI is never the only control.
+ * so hiding the route or link is never the only control.
  */
 export const publicSignUp = createServerFn({ method: "POST" })
   .validator((data: unknown) => signUpSchema.parse(data))
   .handler(async ({ data }) => {
     const supabase = serverPublicClient();
 
-    const { data: settings } = await supabase
+    const { data: settings, error: settingsError } = await supabase
       .from("site_settings")
       .select("allow_registration")
       .eq("id", 1)
       .maybeSingle();
 
+    if (settingsError) {
+      console.error(
+        "[publicSignUp] Unable to verify registration availability",
+        settingsError.message,
+      );
+      throw new Error("Unable to verify registration availability");
+    }
     if (!settings?.allow_registration) {
       return { ok: false as const, reason: "disabled" as const };
     }
 
-    const { error } = await supabase.auth.signUp({
+    const { data: signUpData, error } = await supabase.auth.signUp({
       email: data.email,
       password: data.password,
-      options: data.redirectTo ? { emailRedirectTo: data.redirectTo } : undefined,
+      options: { emailRedirectTo: `${SITE_URL}/auth` },
     });
 
     if (error) {
       console.error("[publicSignUp]", error.message);
+      if (error.code === "user_already_exists") {
+        return { ok: false as const, reason: "exists" as const };
+      }
       return { ok: false as const, reason: "error" as const };
     }
-    return { ok: true as const };
+    return { ok: true as const, emailConfirmationRequired: !signUpData.session };
   });
-
-
-
-
-
