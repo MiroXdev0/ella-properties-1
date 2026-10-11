@@ -205,6 +205,13 @@ function Header({ settings }: { settings: PublicSettings }) {
               {n.label}
             </a>
           ))}
+          <Button
+            asChild
+            size="sm"
+            className="whitespace-nowrap bg-navy text-white hover:bg-navy-deep"
+          >
+            <Link to="/admin">Админ панел</Link>
+          </Button>
         </nav>
         <div className="hidden shrink-0 xl:flex">
           <Button asChild variant="default" className="whitespace-nowrap bg-navy text-white hover:bg-navy-deep">
@@ -249,6 +256,13 @@ function Header({ settings }: { settings: PublicSettings }) {
               <Phone className="mr-2 h-4 w-4" />
               {settings.phone1}
             </a>
+            <Button
+              asChild
+              variant="outline"
+              className="mt-2 w-full border-navy text-navy hover:bg-navy hover:text-white"
+            >
+              <Link to="/admin">Админ панел</Link>
+            </Button>
           </nav>
         </div>
       )}
