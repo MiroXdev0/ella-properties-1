@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "miroxdev0-ella-properties-1",
+  "name": "ella-properties-1",
   "compatibility_date": "2026-10-11",
   "compatibility_flags": ["nodejs_compat"],
   "main": "src/server.ts",

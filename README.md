@@ -1,6 +1,6 @@
 # Елла Недвижими Имоти
 
-Production website for the real-estate agency, built with React, TypeScript, TanStack Start, Vite, Cloudflare Workers, and Supabase. The public site is deployed at <https://ellaimoti.pages.dev/>.
+Production website for the real-estate agency, built with React, TypeScript, TanStack Start, Vite, Cloudflare Workers, and Supabase. The public site is deployed at <https://ella-properties-1.miroxdev2026.workers.dev/>.
 
 ## Requirements
 
@@ -37,6 +37,8 @@ The build uses the project's checked-in Vite, TanStack Start, and Cloudflare Vit
 - Runtime secret: `SUPABASE_SERVICE_ROLE_KEY`
 
 Never place the service-role key in a client-exposed variable or commit it. After installing the project dependencies and configuring build-time variables:
+
+In Supabase Authentication → URL Configuration, set the Site URL to `https://ella-properties-1.miroxdev2026.workers.dev` and allow the exact callback URLs `https://ella-properties-1.miroxdev2026.workers.dev/auth` and `https://ella-properties-1.miroxdev2026.workers.dev/reset-password`.
 
 ```sh
 node ./node_modules/wrangler/bin/wrangler.js login

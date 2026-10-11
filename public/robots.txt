@@ -2,4 +2,4 @@ User-agent: *
 Allow: /
 Disallow: /admin
 
-Sitemap: https://ellaimoti.pages.dev/sitemap.xml
+Sitemap: https://ella-properties-1.miroxdev2026.workers.dev/sitemap.xml

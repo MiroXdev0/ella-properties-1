@@ -1,4 +1,4 @@
-export const SITE_URL = "https://ellaimoti.pages.dev";
+export const SITE_URL = "https://ella-properties-1.miroxdev2026.workers.dev";
 
 export function legalHead(title: string, description: string, path: string) {
   return {
