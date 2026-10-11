@@ -17,7 +17,7 @@ export const DEFAULT_SETTINGS = {
   brand_tagline: "Недвижими имоти",
   primary_color: "#0B1E3B",
   accent_color: "#C6A15B",
-  hero_eyebrow: "Агенция в област Перник и София",
+  hero_eyebrow: "Агенция за недвижими имоти",
   hero_title: "Имоти, избрани с внимание. Сделки, водени с доверие.",
   hero_subtitle:
     "Елла Недвижими Имоти съдейства при покупка, продажба и отдаване под наем на имоти в област Перник и София.",
@@ -39,7 +39,7 @@ export const DEFAULT_SETTINGS = {
   stat3_label: "",
   about_stat4_value: "",
   about_stat4_label: "",
-  allow_registration: false,
+  allow_registration: true,
   logo_url: "/ella-imoti-logo.png",
   phone1: "+359 88 481 6232",
   phone2: "+359 88 438 8022",

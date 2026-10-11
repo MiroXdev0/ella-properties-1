@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Toaster } from "@/components/ui/sonner";
 import { useSiteSettings } from "@/hooks/use-site-settings";
 import { publicSignUp } from "@/lib/auth.functions";
+import { SITE_URL } from "@/lib/seo";
 import { useLanguage } from "@/i18n/LanguageProvider";
 import { LanguageSwitcher } from "@/i18n/LanguageSwitcher";
 
@@ -61,7 +62,7 @@ function AuthPage() {
     try {
       if (mode === "forgot") {
         const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-          redirectTo: `${window.location.origin}/reset-password`,
+          redirectTo: `${SITE_URL}/reset-password`,
         });
         if (error) throw error;
         toast.success(t("auth.emailSent"));
@@ -206,6 +207,3 @@ function AuthPage() {
     </div>
   );
 }
-
-
-
