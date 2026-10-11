@@ -2,12 +2,13 @@ import { fileURLToPath } from "node:url";
 
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
+import { cloudflare } from "@cloudflare/vite-plugin";
 import react from "@vitejs/plugin-react";
-import { nitro } from "nitro/vite";
 import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [
+    cloudflare({ viteEnvironment: { name: "ssr" } }),
     tailwindcss(),
     tanstackStart({
       importProtection: {
@@ -15,10 +16,6 @@ export default defineConfig({
         client: { files: ["**/server/**"], specifiers: ["server-only"] },
       },
       server: { entry: "server" },
-    }),
-    nitro({
-      preset: "cloudflare-module",
-      cloudflare: { nodeCompat: true, deployConfig: true },
     }),
     react(),
   ],

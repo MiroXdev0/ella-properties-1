@@ -7,8 +7,9 @@
     "dev": "node ./node_modules/vite/bin/vite.js dev",
     "build": "node ./node_modules/vite/bin/vite.js build",
     "build:dev": "node ./node_modules/vite/bin/vite.js build --mode development",
-    "preview": "node ./node_modules/wrangler/bin/wrangler.js --cwd .output dev",
-    "deploy": "node ./node_modules/wrangler/bin/wrangler.js deploy --config .output/server/wrangler.json",
+    "preview": "node ./node_modules/vite/bin/vite.js preview",
+    "deploy": "node ./node_modules/vite/bin/vite.js build && node ./node_modules/wrangler/bin/wrangler.js deploy --keep-vars",
+    "cf-typegen": "node ./node_modules/wrangler/bin/wrangler.js types",
     "lint": "node ./node_modules/eslint/bin/eslint.js .",
     "format": "node ./node_modules/prettier/bin/prettier.cjs --write ."
   },
@@ -69,6 +70,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "1.63.1",
     "@eslint/js": "^9.32.0",
     "@types/node": "^22.16.5",
     "@types/react": "^19.2.0",
@@ -80,7 +82,6 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^15.15.0",
-    "nitro": "3.0.260603-beta",
     "prettier": "^3.7.3",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.56.1",

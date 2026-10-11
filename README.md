@@ -1,6 +1,6 @@
 # Елла Недвижими Имоти
 
-Production website for the real-estate agency, built with React, TypeScript, TanStack Start, Vite, Nitro, and Supabase. The public site is deployed at <https://ellaimoti.pages.dev/>.
+Production website for the real-estate agency, built with React, TypeScript, TanStack Start, Vite, Cloudflare Workers, and Supabase. The public site is deployed at <https://ellaimoti.pages.dev/>.
 
 ## Requirements
 
@@ -27,11 +27,11 @@ bun run build
 bun run preview
 ```
 
-TanStack Start renders pages on the server and exposes server functions and API routes. Nitro builds the application as a Cloudflare Workers module with static assets in `.output/`; this is not a static-only site. `bun run preview` runs the generated Worker locally with Wrangler.
+TanStack Start renders pages on the server and exposes server functions and API routes. The official Cloudflare Vite plugin builds and previews the Worker and its static assets; this is not a static-only site. `bun run preview` runs the production build in Cloudflare's local Worker runtime.
 
 ## Independent Cloudflare deployment
 
-The build uses the project's checked-in Vite, TanStack Start, and Nitro configuration. Provide `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in the build environment (for example, in the local `.env` file or CI variables), because Vite embeds them in the client assets. Separately set these runtime bindings in Cloudflare Worker settings:
+The build uses the project's checked-in Vite, TanStack Start, and Cloudflare Vite plugin configuration in [`vite.config.ts`](./vite.config.ts) and [`wrangler.jsonc`](./wrangler.jsonc). Provide `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in the build environment (for example, in the local `.env` file or CI variables), because Vite embeds them in the client assets. Separately set these runtime bindings in Cloudflare Worker settings:
 
 - Runtime variables: `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`
 - Runtime secret: `SUPABASE_SERVICE_ROLE_KEY`
@@ -39,12 +39,11 @@ The build uses the project's checked-in Vite, TanStack Start, and Nitro configur
 Never place the service-role key in a client-exposed variable or commit it. After installing the project dependencies and configuring build-time variables:
 
 ```sh
-bun run build
 node ./node_modules/wrangler/bin/wrangler.js login
 bun run deploy
 ```
 
-The deploy script publishes the Nitro-generated `.output/server/wrangler.json` Worker configuration and its associated assets. Add the runtime variables/secrets in the Cloudflare dashboard (or with Wrangler) before serving production traffic. The repository does not change any live deployment.
+The deploy script builds the app and deploys it using `wrangler.jsonc`, preserving runtime variables already configured in the Cloudflare dashboard. Add required runtime variables/secrets in Cloudflare before serving production traffic. The repository does not change any live deployment.
 
 Supabase remains an external backend dependency for authentication, property/site data, storage, and privileged server operations. Apply database migrations from `supabase/migrations/` through your Supabase deployment process; this project does not modify production data during build or deployment.
 
