@@ -289,23 +289,15 @@ function Logo({ settings }: { settings: PublicSettings }) {
   const name = displayBrandName(settings.brand_name);
   const logoUrl = publicLogoUrl(settings.logo_url) ?? "/ella-imoti-logo.png";
   return (
-    <span className="flex min-w-0 items-center gap-2 sm:gap-3">
+    <span className="flex min-w-0 items-center">
       <img
         src={logoUrl}
         alt={name}
         width={588}
         height={280}
         fetchPriority="high"
-        className="h-14 w-auto max-w-full object-contain sm:h-16"
+        className="h-14 w-auto max-w-[min(46vw,14rem)] object-contain sm:h-16 sm:max-w-[17rem]"
       />
-      <span className="min-w-0 border-l-2 border-blue-700 pl-2 text-left sm:pl-3">
-        <span className="block font-sans text-base font-semibold leading-none tracking-tight text-blue-700 sm:text-lg">
-          {name.split(" ")[0]}
-        </span>
-        <span className="mt-1 block whitespace-nowrap font-sans text-[9px] font-medium uppercase leading-none tracking-[0.12em] text-black sm:text-[10px]">
-          {name.split(" ").slice(1).join(" ")}
-        </span>
-      </span>
     </span>
   );
 }
