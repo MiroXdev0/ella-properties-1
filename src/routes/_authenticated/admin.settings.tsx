@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -38,13 +38,15 @@ export const Route = createFileRoute("/_authenticated/admin/settings")({
 function SettingsAdmin() {
   const [form, setForm] = useState<Partial<SettingsRow>>({});
   const [saving, setSaving] = useState(false);
+  const queryClient = useQueryClient();
 
-  const { data } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["admin-settings"],
     queryFn: async () => {
       const { data, error } = await supabase.from("site_settings").select("*").eq("id", 1).maybeSingle();
       if (error) throw error;
-      return data as unknown as SettingsRow | null;
+      if (!data) throw new Error("Настройките на сайта не са намерени.");
+      return data as unknown as SettingsRow;
     },
   });
 
@@ -52,12 +54,33 @@ function SettingsAdmin() {
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
+    if (!data) return;
+
     setSaving(true);
-    const { id: _id, ...update } = form as SettingsRow;
-    const { error } = await supabase.from("site_settings").update(update as never).eq("id", 1);
-    setSaving(false);
-    if (error) return toast.error(error.message);
-    toast.success("Настройките са запазени");
+    try {
+      const { id: _id, ...update } = form as SettingsRow;
+      const { data: saved, error } = await supabase
+        .from("site_settings")
+        .update(update as never)
+        .eq("id", 1)
+        .select("*")
+        .maybeSingle();
+      if (error) throw error;
+      if (!saved) {
+        throw new Error("Промените не са записани. Проверете администраторските си права.");
+      }
+
+      const savedSettings = saved as unknown as SettingsRow;
+      setForm(savedSettings);
+      queryClient.setQueryData(["admin-settings"], savedSettings);
+      await queryClient.invalidateQueries({ queryKey: ["public-site-settings"] });
+      toast.success("Настройките са запазени и обновени");
+    } catch (error) {
+      console.error("[admin-settings] Unable to save settings", error);
+      toast.error(error instanceof Error ? error.message : "Грешка при запазване на настройките.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   const set = <K extends keyof SettingsRow>(k: K, v: SettingsRow[K]) =>
@@ -75,6 +98,18 @@ function SettingsAdmin() {
         <p className="text-sm text-muted-foreground">Съдържание, бранд, контакти и социални мрежи</p>
       </div>
 
+      {isLoading ? (
+        <p role="status" className="text-sm text-muted-foreground">Зареждане на настройките...</p>
+      ) : isError ? (
+        <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+          <p className="text-sm text-destructive">
+            Настройките не можаха да се заредят: {error instanceof Error ? error.message : "Неизвестна грешка"}
+          </p>
+          <Button type="button" variant="outline" className="mt-3" onClick={() => void refetch()}>
+            Опитай отново
+          </Button>
+        </div>
+      ) : data ? (
       <form onSubmit={save} className="space-y-6">
         <Section title="Бранд и цветове">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -322,11 +357,12 @@ function SettingsAdmin() {
         </Section>
 
         <div className="flex justify-end">
-          <Button type="submit" disabled={saving} className="bg-navy hover:bg-navy-deep">
+          <Button type="submit" disabled={saving || !data} className="bg-navy hover:bg-navy-deep">
             {saving ? "Запазване..." : "Запази настройките"}
           </Button>
         </div>
       </form>
+      ) : null}
     </div>
   );
 }
@@ -345,6 +381,5 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (<div><Label>{label}</Label><div className="mt-1.5">{children}</div></div>);
 }
-
 
 

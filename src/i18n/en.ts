@@ -107,6 +107,7 @@ export const en: Record<keyof typeof bg, string> = {
   "property.apartment": "Apartment",
   "property.house": "House",
   "property.plot": "Plot",
+  "property.agriculturalLand": "Agricultural land",
   "property.business": "Commercial property",
   "property.all": "All",
   "property.storiesHouse": "{count} floors",

@@ -1,4 +1,4 @@
-export type PropertyType = "Апартамент" | "Къща" | "Парцел" | "Бизнес имот";
+export type PropertyType = "Апартамент" | "Къща" | "Парцел" | "Земеделска земя" | "Бизнес имот";
 export type Listing = "Продажба" | "Наем";
 export const APARTMENT_LAYOUTS = [
   "Едностаен",
@@ -23,8 +23,3 @@ export interface Property {
   image: string | null;
   description: string;
 }
-
-
-
-
-

@@ -105,6 +105,7 @@ export const bg = {
   "property.apartment": "Апартамент",
   "property.house": "Къща",
   "property.plot": "Парцел",
+  "property.agriculturalLand": "Земеделска земя",
   "property.business": "Бизнес имот",
   "property.all": "Всички",
   "property.storiesHouse": "{count} етажа",

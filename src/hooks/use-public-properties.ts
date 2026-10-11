@@ -9,7 +9,7 @@ import {
 } from "@/data/properties";
 
 function mapType(t: string): PropertyType {
-  if (t === "Апартамент" || t === "Къща" || t === "Парцел") return t;
+  if (t === "Апартамент" || t === "Къща" || t === "Парцел" || t === "Земеделска земя") return t;
   return "Бизнес имот";
 }
 
@@ -53,6 +53,4 @@ export function usePublicProperties(initialProperties: Property[]) {
 
   return { properties: data, isLoading };
 }
-
-
 

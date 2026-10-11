@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Pencil, Trash2, Eye, EyeOff, Search, Upload, X, Image as ImageIcon } from "lucide-react";
+import { Plus, Pencil, Trash2, Eye, EyeOff, Search, Upload, X, Video } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -24,7 +24,15 @@ export const Route = createFileRoute("/_authenticated/admin/properties")({
   component: PropertiesAdmin,
 });
 
-const TYPES = ["Апартамент", "Къща", "Парцел", "Офис", "Магазин", "Бизнес имот"] as const;
+const TYPES = [
+  "Апартамент",
+  "Къща",
+  "Парцел",
+  "Земеделска земя",
+  "Офис",
+  "Магазин",
+  "Бизнес имот",
+] as const;
 const LAYOUTS = ["Едностаен", "Двустаен", "Тристаен", "Четиристаен", "Мезонет"] as const;
 const STATUSES = ["Продава", "Под наем", "Продаден", "Отдаден"] as const;
 type PropType = typeof TYPES[number];
@@ -33,7 +41,7 @@ type PropStatus = typeof STATUSES[number];
 // Кои полета имат смисъл за даден тип имот
 const hasLayout = (t: PropType) => t === "Апартамент";
 const hasFloor = (t: PropType) => t === "Апартамент" || t === "Офис" || t === "Магазин" || t === "Бизнес имот" || t === "Къща";
-const hasRooms = (t: PropType) => t !== "Парцел";
+const hasRooms = (t: PropType) => t !== "Парцел" && t !== "Земеделска земя";
 
 type Img = { id?: string; url: string; storage_path?: string | null; sort_order: number };
 
@@ -268,7 +276,8 @@ function PropertyDialog({
       }
       const next = [...images, ...uploaded];
       setImages(next);
-      if (!form.main_image && uploaded[0]) setForm((f) => ({ ...f, main_image: uploaded[0].url }));
+      const firstImage = uploaded.find((image) => !isVideoUrl(image.url));
+      if (!form.main_image && firstImage) setForm((f) => ({ ...f, main_image: firstImage.url }));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Грешка при качване");
     } finally {
@@ -301,7 +310,9 @@ function PropertyDialog({
         floor: hasFloor(form.type) && form.floor ? form.floor : null,
         map_lat: form.map_lat ? Number(form.map_lat) : null,
         map_lng: form.map_lng ? Number(form.map_lng) : null,
-        main_image: form.main_image || images[0]?.url || null,
+        main_image: form.main_image && !isVideoUrl(form.main_image)
+          ? form.main_image
+          : images.find((image) => !isVideoUrl(image.url))?.url || null,
       };
       let propertyId = editing?.id;
       if (editing) {
@@ -426,23 +437,43 @@ function PropertyDialog({
                   <button type="button" onClick={() => removeImage(idx)} className="absolute right-1 top-1 grid h-7 w-7 place-items-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100">
                     <X className="h-3.5 w-3.5" />
                   </button>
-                  {form.main_image === img.url && (
-                    <span className="absolute bottom-1 left-1 rounded bg-gold px-1.5 py-0.5 text-[10px] font-medium text-navy-deep">Основна</span>
+                    {isVideoUrl(img.url) && (
+                      <span className="absolute bottom-1 left-1 inline-flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">
+                        <Video className="h-3 w-3" /> Видео
+                      </span>
+                    )}
+                    {!isVideoUrl(img.url) && form.main_image === img.url && (
+                      <span className="absolute bottom-1 left-1 rounded bg-gold px-1.5 py-0.5 text-[10px] font-medium text-navy-deep">Основна</span>
+                    )}
+                    {!isVideoUrl(img.url) && form.main_image !== img.url && (
+                      <button type="button" onClick={() => setForm({ ...form, main_image: img.url })} className="absolute bottom-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover:opacity-100">
+                        Основна
+                      </button>
                   )}
-                  {form.main_image !== img.url && (
-                    <button type="button" onClick={() => setForm({ ...form, main_image: img.url })} className="absolute bottom-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover:opacity-100">
-                      Основна
-                    </button>
-                  )}
-                </div>
+                  </div>
               ))}
               <label className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed text-muted-foreground hover:border-navy hover:text-navy">
-                {uploading ? <span className="text-xs">Качване...</span> : (
-                  <><Upload className="h-5 w-5" /><span className="text-xs">Качи</span></>
-                )}
-                <input type="file" accept="image/*,video/*" multiple className="hidden" onChange={(e) => uploadFiles(e.target.files)} />
+                  {uploading ? <span className="text-xs">Качване...</span> : (
+                    <><Upload className="h-5 w-5" /><span className="text-xs">Качи снимки</span></>
+                  )}
+                  <input type="file" accept="image/*" multiple disabled={uploading} className="hidden" onChange={(e) => {
+                    void uploadFiles(e.target.files);
+                    e.currentTarget.value = "";
+                  }} />
+              </label>
+              <label className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed text-muted-foreground hover:border-navy hover:text-navy">
+                  {uploading ? <span className="text-xs">Качване...</span> : (
+                    <><Video className="h-5 w-5" /><span className="text-xs">Качи видео</span></>
+                  )}
+                  <input type="file" accept="video/*" multiple disabled={uploading} className="hidden" onChange={(e) => {
+                    void uploadFiles(e.currentTarget.files);
+                    e.currentTarget.value = "";
+                  }} />
               </label>
             </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Можете да добавите снимки и видео файлове до 25 MB всеки. YouTube/Vimeo линковете остават налични по-долу.
+            </p>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -496,8 +527,5 @@ function Field({ label, required, children }: { label: string; required?: boolea
     </div>
   );
 }
-
-
-
 
 
