@@ -12,9 +12,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { OPEN_PREFS_EVENT, saveConsent, useConsent } from "@/lib/consent";
+import { useLanguage } from "@/i18n/LanguageProvider";
 
 export function ConsentBanner() {
   const { consent, ready } = useConsent();
+  const { language, t } = useLanguage();
   const [open, setOpen] = useState(false);
   const [media, setMedia] = useState(false);
 
@@ -34,26 +36,25 @@ export function ConsentBanner() {
       {showBanner && (
         <section
           role="region"
-          aria-label="Бисквитки и външно съдържание"
+          lang={language}
+          aria-label={`${t("consent.title")}: ${t("consent.external")}`}
           className="fixed inset-x-3 bottom-3 z-[60] mx-auto max-w-3xl rounded-2xl border border-border bg-card p-5 text-card-foreground shadow-2xl sm:inset-x-6 sm:p-6"
         >
-          <h2 className="font-display text-lg text-foreground">Вашата поверителност</h2>
+          <h2 className="font-display text-lg text-foreground">{t("consent.title")}</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Използваме само необходимо локално съхранение, за да работи сайтът. Карти и видеа от
-            външни услуги (Google Maps, YouTube, Vimeo) могат да поставят бисквитки и се зареждат
-            само с Ваше съгласие. Не използваме аналитика или реклами.{" "}
+            {t("consent.description")}{" "}
             <Link to="/cookies" className="underline underline-offset-2 hover:text-foreground">
-              Политика за бисквитките
+              {t("consent.policy")}
             </Link>
             {" · "}
             <Link to="/privacy" className="underline underline-offset-2 hover:text-foreground">
-              Поверителност
+              {t("consent.privacy")}
             </Link>
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
-            <Button onClick={() => saveConsent(true)}>Приемам всички</Button>
+            <Button onClick={() => saveConsent(true)}>{t("consent.acceptAll")}</Button>
             <Button variant="outline" onClick={() => saveConsent(false)}>
-              Само необходимите
+              {t("consent.necessaryOnly")}
             </Button>
             <Button
               variant="ghost"
@@ -62,7 +63,7 @@ export function ConsentBanner() {
                 setOpen(true);
               }}
             >
-              Настройки
+              {t("consent.settings")}
             </Button>
           </div>
         </section>
@@ -71,30 +72,28 @@ export function ConsentBanner() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Настройки на бисквитките</DialogTitle>
+            <DialogTitle>{t("consent.dialogTitle")}</DialogTitle>
             <DialogDescription>
-              Можете да промените или оттеглите съгласието си по всяко време от връзката
-              „Настройки на бисквитките“ в долната част на сайта.
+              {t("consent.dialogDescription")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="flex items-start justify-between gap-4 rounded-lg border border-border p-4">
               <div>
-                <div className="font-medium text-foreground">Необходими</div>
+                <div className="font-medium text-foreground">{t("consent.necessary")}</div>
                 <p className="text-sm text-muted-foreground">
-                  Вход в админ панела и запомняне на този избор. Винаги активни.
+                  {t("consent.necessaryDescription")}
                 </p>
               </div>
-              <Switch checked disabled aria-label="Необходими — винаги активни" />
+              <Switch checked disabled aria-label={t("consent.necessaryAria")} />
             </div>
             <div className="flex items-start justify-between gap-4 rounded-lg border border-border p-4">
               <div>
                 <label htmlFor="consent-media" className="font-medium text-foreground">
-                  Външно съдържание
+                  {t("consent.external")}
                 </label>
                 <p className="text-sm text-muted-foreground">
-                  Карти (Google Maps) и видеа (YouTube, Vimeo). Тези услуги могат да поставят
-                  свои бисквитки.
+                  {t("consent.externalDescription")}
                 </p>
               </div>
               <Switch id="consent-media" checked={media} onCheckedChange={setMedia} />
@@ -102,16 +101,15 @@ export function ConsentBanner() {
           </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => { saveConsent(false); setOpen(false); }}>
-              Отказвам всички
+              {t("consent.rejectAll")}
             </Button>
-            <Button onClick={() => { saveConsent(media); setOpen(false); }}>Запази избора</Button>
+            <Button onClick={() => { saveConsent(media); setOpen(false); }}>{t("consent.save")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
   );
 }
-
 
 
 

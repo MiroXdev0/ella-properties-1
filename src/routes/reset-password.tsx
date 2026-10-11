@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Toaster } from "@/components/ui/sonner";
+import { useLanguage } from "@/i18n/LanguageProvider";
+import { LanguageSwitcher } from "@/i18n/LanguageSwitcher";
 
 export const Route = createFileRoute("/reset-password")({
   head: () => ({
@@ -29,13 +31,14 @@ export const Route = createFileRoute("/reset-password")({
 
 function ResetPage() {
   const navigate = useNavigate();
+  const { language, t } = useLanguage();
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (password.length < 6) {
-      toast.error("Минимум 6 символа");
+      toast.error(t("auth.minPassword"));
       return;
     }
     setLoading(true);
@@ -45,19 +48,20 @@ function ResetPage() {
       toast.error(error.message);
       return;
     }
-    toast.success("Паролата е сменена.");
+    toast.success(t("reset.changed"));
     navigate({ to: "/admin" });
   }
 
   return (
-    <div className="min-h-screen bg-navy-deep text-white">
+    <div lang={language} className="min-h-screen bg-navy-deep text-white">
       <Toaster position="top-center" />
       <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-5">
+        <div className="mb-4 flex justify-end"><LanguageSwitcher /></div>
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-8">
-          <h1 className="font-display text-2xl">Задайте нова парола</h1>
+          <h1 className="font-display text-2xl">{t("reset.title")}</h1>
           <form onSubmit={onSubmit} className="mt-6 space-y-4">
             <div>
-              <Label htmlFor="new-password" className="text-white/80">Нова парола</Label>
+              <Label htmlFor="new-password" className="text-white/80">{t("reset.newPassword")}</Label>
               <Input
                 id="new-password"
                 type="password"
@@ -67,7 +71,7 @@ function ResetPage() {
               />
             </div>
             <Button disabled={loading} className="h-11 w-full rounded-full bg-gold text-navy-deep hover:bg-gold-soft">
-              Запази
+              {t("reset.save")}
             </Button>
           </form>
         </div>
@@ -75,7 +79,6 @@ function ResetPage() {
     </div>
   );
 }
-
 
 
 

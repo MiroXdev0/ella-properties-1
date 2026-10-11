@@ -9,6 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { LegalLayout } from "@/components/legal/LegalLayout";
 import { legalHead } from "@/lib/seo";
 import { submitDataRequest, DATA_REQUEST_TYPES } from "@/lib/inquiries.functions";
+import { useLanguage } from "@/i18n/LanguageProvider";
+import type { bg } from "@/i18n/bg";
 
 export const Route = createFileRoute("/data-request")({
   head: () =>
@@ -21,6 +23,7 @@ export const Route = createFileRoute("/data-request")({
 });
 
 function DataRequestPage() {
+  const { language, t } = useLanguage();
   const send = useServerFn(submitDataRequest);
   const [startedAt] = useState(() => Date.now());
   const [f, setF] = useState({ type: "access", name: "", email: "", phone: "", details: "", website: "" });
@@ -29,9 +32,9 @@ function DataRequestPage() {
 
   function validate() {
     const e: Record<string, string> = {};
-    if (!f.name.trim()) e.name = "Моля, въведете име.";
-    if (!/^\S+@\S+\.\S+$/.test(f.email.trim())) e.email = "Моля, въведете валиден имейл.";
-    if (f.phone && !/^[0-9+()\s\-./]{5,40}$/.test(f.phone.trim())) e.phone = "Невалиден телефон.";
+    if (!f.name.trim()) e.name = t("request.nameError");
+    if (!/^\S+@\S+\.\S+$/.test(f.email.trim())) e.email = t("request.emailError");
+    if (f.phone && !/^[0-9+()\s\-./]{5,40}$/.test(f.phone.trim())) e.phone = t("request.phoneError");
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -53,21 +56,14 @@ function DataRequestPage() {
 
   return (
     <LegalLayout title="Права върху личните данни">
-      <p>
-        С тази форма можете да поискате достъп, корекция, изтриване или експорт на данните си, или
-        да оттеглите съгласие. Исканията се разглеждат ръчно от наш служител; ще потвърдим
-        самоличността Ви, преди да изпълним искането, и ще отговорим в срок до един месец. Формата
-        не изпълнява искането автоматично.
-      </p>
-      <p>
-        Съгласието за бисквитки можете да оттеглите веднага от „Настройки на бисквитките“ в долната
-        част на страницата.
-      </p>
+      <div lang={language}>
+        <p>{t("request.intro")}</p>
+        <p>{t("request.cookiesNote")}</p>
 
       <div aria-live="polite">
-        {status === "done" && <p className="rounded-lg border border-border bg-muted p-4">Искането е получено. Ще се свържем с Вас на посочения имейл.</p>}
-        {status === "error" && <p className="text-destructive">Възникна грешка. Моля, опитайте отново или се свържете с нас по телефона.</p>}
-        {status === "rate" && <p className="text-destructive">Твърде много искания. Моля, опитайте по-късно.</p>}
+        {status === "done" && <p className="rounded-lg border border-border bg-muted p-4">{t("request.done")}</p>}
+        {status === "error" && <p className="text-destructive">{t("request.error")}</p>}
+        {status === "rate" && <p className="text-destructive">{t("request.rate")}</p>}
       </div>
 
       {status !== "done" && (
@@ -76,44 +72,52 @@ function DataRequestPage() {
             <label>Уебсайт<input tabIndex={-1} autoComplete="off" value={f.website} onChange={(e) => setF({ ...f, website: e.target.value })} /></label>
           </div>
           <div>
-            <Label htmlFor="dr-type">Вид искане</Label>
+            <Label htmlFor="dr-type">{t("request.type")}</Label>
             <select
               id="dr-type"
               value={f.type}
               onChange={(e) => setF({ ...f, type: e.target.value })}
               className="mt-1.5 h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              {Object.entries(DATA_REQUEST_TYPES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              {Object.entries(DATA_REQUEST_TYPES).map(([v, label]) => {
+                const key = ({
+                  access: "request.typeAccess",
+                  export: "request.typeExport",
+                  correction: "request.typeCorrection",
+                  deletion: "request.typeDeletion",
+                  withdraw: "request.typeWithdraw",
+                } as const satisfies Record<keyof typeof DATA_REQUEST_TYPES, keyof typeof bg>)[v as keyof typeof DATA_REQUEST_TYPES];
+                return <option key={v} value={v}>{t(key, label)}</option>;
+              })}
             </select>
           </div>
           <div>
-            <Label htmlFor="dr-name">Име *</Label>
+            <Label htmlFor="dr-name">{t("request.name")}</Label>
             <Input id="dr-name" autoComplete="name" required aria-invalid={!!errors.name} aria-describedby={errors.name ? "name-err" : undefined} value={f.name} maxLength={100} onChange={(e) => setF({ ...f, name: e.target.value })} className="mt-1.5" />
             {err("name")}
           </div>
           <div>
-            <Label htmlFor="dr-email">Имейл *</Label>
+            <Label htmlFor="dr-email">{t("request.email")}</Label>
             <Input id="dr-email" type="email" autoComplete="email" required aria-invalid={!!errors.email} aria-describedby={errors.email ? "email-err" : undefined} value={f.email} maxLength={255} onChange={(e) => setF({ ...f, email: e.target.value })} className="mt-1.5" />
             {err("email")}
           </div>
           <div>
-            <Label htmlFor="dr-phone">Телефон (по желание, ако сте ни писали с него)</Label>
+            <Label htmlFor="dr-phone">{t("request.phone")}</Label>
             <Input id="dr-phone" type="tel" autoComplete="tel" aria-invalid={!!errors.phone} aria-describedby={errors.phone ? "phone-err" : undefined} value={f.phone} maxLength={40} onChange={(e) => setF({ ...f, phone: e.target.value })} className="mt-1.5" />
             {err("phone")}
           </div>
           <div>
-            <Label htmlFor="dr-details">Подробности (по желание)</Label>
+            <Label htmlFor="dr-details">{t("request.details")}</Label>
             <Textarea id="dr-details" value={f.details} maxLength={1500} onChange={(e) => setF({ ...f, details: e.target.value })} className="mt-1.5 min-h-[120px]" />
           </div>
           <Button type="submit" disabled={status === "sending"}>
-            {status === "sending" ? "Изпращане..." : "Изпрати искането"}
+            {status === "sending" ? t("request.sending") : t("request.send")}
           </Button>
         </form>
       )}
+      </div>
     </LegalLayout>
   );
 }
-
-
 
 

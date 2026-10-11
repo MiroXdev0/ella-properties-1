@@ -17,6 +17,8 @@ import { useSiteSettings } from "@/hooks/use-site-settings";
 import { isVideoUrl, embedUrl } from "@/lib/media";
 import { ConsentEmbed } from "@/components/consent/ConsentEmbed";
 import { SITE_URL } from "@/lib/seo";
+import { useLanguage, useTranslateContent } from "@/i18n/LanguageProvider";
+import { LanguageSwitcher } from "@/i18n/LanguageSwitcher";
 
 type Media = { url: string; kind: "image" | "video" };
 
@@ -183,15 +185,17 @@ function PropertyPending() {
 }
 
 function PropertyNotFound() {
+  const { t } = useLanguage();
   return (
     <main className="mx-auto flex min-h-[60vh] max-w-xl flex-col items-center justify-center px-4 text-center">
-      <h1 className="font-display text-3xl text-navy">Имотът не е намерен</h1>
+      <LanguageSwitcher className="mb-6" />
+      <h1 className="font-display text-3xl text-navy">{t("property.notFound")}</h1>
       <p className="mt-3 text-muted-foreground">
-        Възможно е офертата вече да не е активна. Разгледайте останалите ни имоти.
+        {t("property.notFoundDescription")}
       </p>
       <Button asChild className="mt-6 rounded-full bg-navy text-white hover:bg-navy-deep">
         <Link to="/" hash="catalog">
-          Към имотите
+          {t("property.allProperties")}
         </Link>
       </Button>
     </main>
@@ -201,31 +205,36 @@ function PropertyNotFound() {
 function PropertyDetail() {
   const p = Route.useLoaderData();
   const settings = useSiteSettings();
+  const { language, t } = useLanguage();
+  const translate = useTranslateContent();
   const [active, setActive] = useState(0);
 
-  const priceText = new Intl.NumberFormat("bg-BG").format(p.price);
+  const priceText = new Intl.NumberFormat(language === "en" ? "en-GB" : "bg-BG").format(p.price);
   const current = p.media[active];
   const phone = settings.phone1;
   const tel = `tel:${(phone ?? "").replace(/\s+/g, "")}`;
   const wa = `https://wa.me/${(phone ?? "").replace(/[^0-9]/g, "")}`;
 
   return (
-    <main className="min-h-screen bg-background pb-20">
+    <main lang={language} className="min-h-screen bg-background pb-20">
       <div className="mx-auto max-w-6xl px-4 pt-6 sm:px-6 lg:px-8">
-        <Link
-          to="/"
-          hash="catalog"
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-navy"
-        >
-          <ArrowLeft className="h-4 w-4" /> Обратно към имотите
-        </Link>
+        <div className="flex items-center justify-between gap-4">
+          <Link
+            to="/"
+            hash="catalog"
+            className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-navy"
+          >
+            <ArrowLeft className="h-4 w-4" /> {t("property.back")}
+          </Link>
+          <LanguageSwitcher />
+        </div>
 
         <div className="mt-5 flex flex-wrap items-center gap-2">
           <span className="rounded-full bg-navy px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-white">
-            {p.listing}
+            {translate(p.listing)}
           </span>
           <span className="rounded-full bg-gold px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-navy-deep">
-            {p.type}
+            {translate(p.type)}
           </span>
         </div>
 
@@ -258,7 +267,7 @@ function PropertyDetail() {
                     key={m.url + i}
                     type="button"
                     onClick={() => setActive(i)}
-                    aria-label={`Медия ${i + 1}`}
+                    aria-label={t("property.media").replace("{number}", String(i + 1))}
                     className={`h-16 w-24 shrink-0 overflow-hidden rounded-lg border-2 transition-colors ${
                       i === active ? "border-gold" : "border-transparent opacity-80 hover:opacity-100"
                     }`}
@@ -278,20 +287,20 @@ function PropertyDetail() {
         <div className="mt-8 grid gap-8 lg:grid-cols-3">
           <div className="lg:col-span-2">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <Spec icon={Maximize2} label="Площ" value={`${p.area} м²`} />
-              {p.floor && <Spec icon={Layers} label={p.type === "Къща" ? "Етажи" : "Етаж"} value={p.type === "Къща" ? `${p.floor} етажа` : p.floor} />}
-              {p.layout && <Spec icon={HomeIcon} label="Разпределение" value={p.layout} />}
-              {p.rooms ? <Spec icon={Building2} label="Стаи" value={String(p.rooms)} /> : null}
+              <Spec icon={Maximize2} label={t("property.area")} value={`${p.area} m²`} />
+              {p.floor && <Spec icon={Layers} label={p.type === "Къща" ? t("property.floors") : t("property.floor")} value={p.type === "Къща" ? t("property.storiesHouse").replace("{count}", p.floor) : p.floor} />}
+              {p.layout && <Spec icon={HomeIcon} label={t("property.layout")} value={translate(p.layout)} />}
+              {p.rooms ? <Spec icon={Building2} label={t("property.rooms")} value={String(p.rooms)} /> : null}
             </div>
 
-            <h2 className="mt-8 font-display text-xl text-navy">Описание</h2>
+            <h2 className="mt-8 font-display text-xl text-navy">{t("property.description")}</h2>
             <p className="mt-3 whitespace-pre-line text-foreground/80">
-              {p.description || "Свържете се с нас за пълна информация за този имот."}
+              {p.description || t("property.contactForInfo")}
             </p>
 
             {p.videoEmbed && (
               <>
-                <h2 className="mt-8 font-display text-xl text-navy">Видео</h2>
+                <h2 className="mt-8 font-display text-xl text-navy">{t("property.video")}</h2>
                 <div className="mt-3 aspect-video overflow-hidden rounded-2xl border border-border">
                   {isVideoUrl(p.videoEmbed) ? (
                     <video src={p.videoEmbed} controls className="h-full w-full" />
@@ -299,7 +308,7 @@ function PropertyDetail() {
                     <ConsentEmbed service="YouTube / Vimeo" fallbackHref={p.videoEmbed}>
                     <iframe
                       src={p.videoEmbed}
-                      title="Видео на имота"
+                      title={t("property.videoTitle")}
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; picture-in-picture"
                       allowFullScreen
                       className="h-full w-full"
@@ -312,11 +321,11 @@ function PropertyDetail() {
 
             {p.mapLat != null && p.mapLng != null && (
               <>
-                <h2 className="mt-8 font-display text-xl text-navy">Местоположение</h2>
+                <h2 className="mt-8 font-display text-xl text-navy">{t("property.location")}</h2>
                 <div className="mt-3 aspect-[16/9] overflow-hidden rounded-2xl border border-border">
                   <ConsentEmbed service="Google Maps" fallbackHref={`https://www.google.com/maps?q=${p.mapLat},${p.mapLng}`}>
                   <iframe
-                    title="Карта на имота"
+                    title={t("property.mapTitle")}
                     loading="lazy"
                     className="h-full w-full"
                     src={`https://www.google.com/maps?q=${p.mapLat},${p.mapLng}&z=15&output=embed`}
@@ -328,13 +337,13 @@ function PropertyDetail() {
           </div>
 
           <aside className="h-fit rounded-2xl border border-border bg-card p-6 shadow-sm lg:sticky lg:top-6">
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Цена</div>
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">{t("property.price")}</div>
             <div className="font-display text-3xl font-medium text-navy">
               € {priceText}
-              {p.listing === "Наем" && <span className="text-base text-muted-foreground"> /мес.</span>}
+              {p.listing === "Наем" && <span className="text-base text-muted-foreground"> {t("property.month")}</span>}
             </div>
             <p className="mt-3 text-sm text-muted-foreground">
-              Заявете оглед или попитайте за допълнителна информация — отговаряме бързо.
+              {t("property.contactPrompt")}
             </p>
             <div className="mt-5 flex flex-col gap-3">
               <Button asChild className="rounded-full bg-navy text-white hover:bg-navy-deep">
@@ -349,7 +358,7 @@ function PropertyDetail() {
               </Button>
               <Button asChild variant="ghost" className="rounded-full">
                 <Link to="/" hash="contact">
-                  Изпрати запитване
+                  {t("property.sendInquiry")}
                 </Link>
               </Button>
             </div>
@@ -377,4 +386,3 @@ function Spec({
     </div>
   );
 }
-
