@@ -75,24 +75,27 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Елла Недвижими Имоти — Агенция в област Перник и София" },
+      { title: "Елла Недвижими Имоти — актуални обяви за имоти" },
       {
         name: "description",
         content:
-          "Елла Недвижими Имоти — професионална агенция в област Перник и София за продажба, покупка и наем на апартаменти, къщи, парцели и бизнес имоти.",
+          "Елла Недвижими Имоти — актуални обяви за продажба и наем на имоти в градовете с публикувани оферти.",
       },
       { name: "author", content: "Елла Недвижими Имоти" },
-      { property: "og:title", content: "Елла Недвижими Имоти — Агенция в област Перник и София" },
+      { property: "og:title", content: "Елла Недвижими Имоти — актуални обяви за имоти" },
       {
         property: "og:description",
         content:
-          "Професионално съдействие при покупка, продажба и отдаване под наем на имоти в област Перник и София.",
+          "Актуални обяви и съдействие при покупка, продажба и отдаване под наем на имоти.",
       },
       { property: "og:type", content: "website" },
       { property: "og:site_name", content: "Елла Недвижими Имоти" },
       { property: "og:locale", content: "bg_BG" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "theme-color", content: "#0B1E3B" },
+      { name: "mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-title", content: "Елла Имоти" },
     ],
     links: [
       {
@@ -100,6 +103,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: appCss,
       },
       { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
+      { rel: "manifest", href: "/manifest.webmanifest" },
+      { rel: "apple-touch-icon", href: "/app-icon-192.png" },
     ],
   }),
   shellComponent: RootShell,

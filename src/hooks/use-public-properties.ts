@@ -30,7 +30,7 @@ export async function fetchPublicProperties(): Promise<Property[]> {
     title: p.title,
     type: mapType(p.type),
     listing: mapListing(p.status),
-    city: p.city ?? "",
+    city: p.city?.trim() ?? "",
     district: p.district ?? "",
     price: Number(p.price ?? 0),
     area: Number(p.area ?? 0),
@@ -53,4 +53,3 @@ export function usePublicProperties(initialProperties: Property[]) {
 
   return { properties: data, isLoading };
 }
-

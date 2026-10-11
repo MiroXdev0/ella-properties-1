@@ -20,6 +20,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PropertiesIdRouteImport } from './routes/properties.$id'
+import { Route as ImotiVSlugRouteImport } from './routes/imoti-v.$slug'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin.users'
@@ -83,6 +84,11 @@ const PropertiesIdRoute = PropertiesIdRouteImport.update({
   path: '/properties/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ImotiVSlugRoute = ImotiVSlugRouteImport.update({
+  id: '/imoti-v/$slug',
+  path: '/imoti-v/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -138,6 +144,7 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/imoti-v/$slug': typeof ImotiVSlugRoute
   '/properties/$id': typeof PropertiesIdRoute
   '/admin/inquiries': typeof AuthenticatedAdminInquiriesRoute
   '/admin/properties': typeof AuthenticatedAdminPropertiesRoute
@@ -157,6 +164,7 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
+  '/imoti-v/$slug': typeof ImotiVSlugRoute
   '/properties/$id': typeof PropertiesIdRoute
   '/admin/inquiries': typeof AuthenticatedAdminInquiriesRoute
   '/admin/properties': typeof AuthenticatedAdminPropertiesRoute
@@ -179,6 +187,7 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/imoti-v/$slug': typeof ImotiVSlugRoute
   '/properties/$id': typeof PropertiesIdRoute
   '/_authenticated/admin/inquiries': typeof AuthenticatedAdminInquiriesRoute
   '/_authenticated/admin/properties': typeof AuthenticatedAdminPropertiesRoute
@@ -201,6 +210,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/terms'
     | '/admin'
+    | '/imoti-v/$slug'
     | '/properties/$id'
     | '/admin/inquiries'
     | '/admin/properties'
@@ -220,6 +230,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/sitemap.xml'
     | '/terms'
+    | '/imoti-v/$slug'
     | '/properties/$id'
     | '/admin/inquiries'
     | '/admin/properties'
@@ -241,6 +252,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/terms'
     | '/_authenticated/admin'
+    | '/imoti-v/$slug'
     | '/properties/$id'
     | '/_authenticated/admin/inquiries'
     | '/_authenticated/admin/properties'
@@ -262,6 +274,7 @@ export interface RootRouteChildren {
   SignupRoute: typeof SignupRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TermsRoute: typeof TermsRoute
+  ImotiVSlugRoute: typeof ImotiVSlugRoute
   PropertiesIdRoute: typeof PropertiesIdRoute
   ApiPublicMediaSplatRoute: typeof ApiPublicMediaSplatRoute
 }
@@ -343,6 +356,13 @@ declare module '@tanstack/react-router' {
       path: '/properties/$id'
       fullPath: '/properties/$id'
       preLoaderRoute: typeof PropertiesIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/imoti-v/$slug': {
+      id: '/imoti-v/$slug'
+      path: '/imoti-v/$slug'
+      fullPath: '/imoti-v/$slug'
+      preLoaderRoute: typeof ImotiVSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/admin': {
@@ -447,6 +467,7 @@ const rootRouteChildren: RootRouteChildren = {
   SignupRoute: SignupRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   TermsRoute: TermsRoute,
+  ImotiVSlugRoute: ImotiVSlugRoute,
   PropertiesIdRoute: PropertiesIdRoute,
   ApiPublicMediaSplatRoute: ApiPublicMediaSplatRoute,
 }

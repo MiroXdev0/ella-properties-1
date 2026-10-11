@@ -3,6 +3,7 @@ import type {} from "@tanstack/react-start";
 
 import { supabase } from "@/integrations/supabase/client";
 import { SITE_URL } from "@/lib/seo";
+import { citySlug } from "@/lib/cities";
 
 interface SitemapEntry {
   path: string;
@@ -19,7 +20,7 @@ async function publishedPropertyEntries(): Promise<SitemapEntry[]> {
   while (true) {
     const { data, error } = await supabase
       .from("properties")
-      .select("id,updated_at")
+      .select("id,city,updated_at")
       .eq("is_published", true)
       .order("created_at", { ascending: false })
       .range(offset, offset + PAGE_SIZE - 1);
@@ -33,6 +34,9 @@ async function publishedPropertyEntries(): Promise<SitemapEntry[]> {
         path: `/properties/${encodeURIComponent(property.id)}`,
         ...(date && !Number.isNaN(date.valueOf()) ? { lastmod: date.toISOString().slice(0, 10) } : {}),
       });
+      const city = property.city?.trim();
+      const slug = city ? citySlug(city) : "";
+      if (slug) entries.push({ path: `/imoti-v/${encodeURIComponent(slug)}` });
     }
 
     if (!data || data.length < PAGE_SIZE) break;

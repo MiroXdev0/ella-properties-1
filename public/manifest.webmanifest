@@ -1,0 +1,27 @@
+{
+  "id": "/",
+  "name": "Елла Недвижими Имоти",
+  "short_name": "Елла Имоти",
+  "description": "Недвижими имоти в градовете с актуални обяви",
+  "lang": "bg",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0B1E3B",
+  "theme_color": "#0B1E3B",
+  "icons": [
+    {
+      "src": "/app-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/app-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { SettingsRow } from "@/lib/admin/queries";
+import { broadenLegacyCoverageText } from "@/lib/cities";
 
 export type NavLink = { href: string; label: string };
 export type ServiceItem = { icon: string; title: string; items: string[] };
@@ -20,7 +21,7 @@ export const DEFAULT_SETTINGS = {
   hero_eyebrow: "Агенция за недвижими имоти",
   hero_title: "Имоти, избрани с внимание. Сделки, водени с доверие.",
   hero_subtitle:
-    "Елла Недвижими Имоти съдейства при покупка, продажба и отдаване под наем на имоти в област Перник и София.",
+    "Елла Недвижими Имоти съдейства при покупка, продажба и отдаване под наем на имоти в градовете с актуални обяви.",
   hero_cta_label: "Разгледайте имотите",
   hero_cta_link: "#catalog",
   hero_secondary_cta_label: "Свържете се с нас",
@@ -29,7 +30,7 @@ export const DEFAULT_SETTINGS = {
   about_eyebrow: "За нас",
   about_title: "Имоти, избрани с внимание към детайла",
   about_text:
-    "Елла Недвижими Имоти предлага пълен спектър от професионални услуги в областта на недвижимите имоти. Помагаме на клиентите си да вземат уверени и информирани решения при покупка, продажба или отдаване под наем на имот в област Перник и София.",
+    "Елла Недвижими Имоти предлага пълен спектър от професионални услуги в областта на недвижимите имоти. Помагаме на клиентите си да вземат уверени и информирани решения при покупка, продажба или отдаване под наем на имоти в градовете с актуални обяви.",
   about_text_secondary: "",
   stat1_value: "",
   stat1_label: "",
@@ -47,6 +48,7 @@ export const DEFAULT_SETTINGS = {
   address: "Център, ул. „Райко Даскалов“ 4, 2300 Перник",
   facebook_url: "",
   instagram_url: "",
+  tiktok_url: "",
   whatsapp_number: "+359884816232",
   viber_number: "+359884816232",
   nav_links: [
@@ -70,7 +72,7 @@ export const DEFAULT_SETTINGS = {
   why_title: "Доверие, изградено върху резултати",
   why_reasons: [
     "Професионално и лично отношение",
-    "Задълбочено познаване на пазара в област Перник и София",
+    "Актуални предложения в градовете, в които публикуваме обяви",
     "Прозрачност, коректност и дискретност",
     "Индивидуален подход към всеки клиент",
     "Съдействие през етапите на сделката",
@@ -88,9 +90,9 @@ export const DEFAULT_SETTINGS = {
     "https://www.google.com/maps?q=%D1%83%D0%BB.+%D0%A0%D0%B0%D0%B9%D0%BA%D0%BE+%D0%94%D0%B0%D1%81%D0%BA%D0%B0%D0%BB%D0%BE%D0%B2+4,+%D0%9F%D0%B5%D1%80%D0%BD%D0%B8%D0%BA&output=embed",
   contact_map_url: "https://maps.app.goo.gl/gWxiPmH7sDt9MtwBA",
   footer_description:
-    "Информация за имоти и услуги на Елла Недвижими Имоти в област Перник и София.",
+    "Актуални обяви за имоти и информация за услугите на Елла Недвижими Имоти.",
   footer_copyright: "© {year} Елла Недвижими Имоти. Всички права запазени.",
-  seo_home_title: "Елла Недвижими Имоти — Имоти в Перник и София",
+  seo_home_title: "Елла Недвижими Имоти — актуални обяви за имоти",
   seo_home_description:
     "Информация за имоти, услуги и контакти на Елла Недвижими Имоти. Съдействие при покупка, продажба и отдаване под наем.",
 };
@@ -106,6 +108,23 @@ function mergeSettings(data: SettingsRow | null): PublicSettings {
         (merged as Record<string, unknown>)[key] = value;
       }
     }
+
+    const coverageText = (text: string) =>
+      broadenLegacyCoverageText(text, /[А-Яа-я]/u.test(text) ? "bg" : "en");
+    for (const key of [
+      "hero_eyebrow",
+      "hero_title",
+      "hero_subtitle",
+      "about_title",
+      "about_text",
+      "about_text_secondary",
+      "footer_description",
+      "seo_home_title",
+      "seo_home_description",
+    ] as const) {
+      merged[key] = coverageText(merged[key]);
+    }
+    merged.why_reasons = merged.why_reasons.map(coverageText);
 
     const brandName = merged.brand_name.trim().toLocaleLowerCase("bg");
     const seoTitle = merged.seo_home_title.trim().toLocaleLowerCase("bg");
@@ -151,4 +170,3 @@ export function useSiteSettings(initialSettings?: PublicSettings): PublicSetting
   });
   return data ?? initialSettings ?? DEFAULT_SETTINGS;
 }
-

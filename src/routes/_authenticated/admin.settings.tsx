@@ -180,6 +180,14 @@ function SettingsAdmin() {
           <div className="grid gap-4 sm:grid-cols-2">
             <Row label="Facebook URL"><Input value={form.facebook_url ?? ""} onChange={(e) => set("facebook_url", e.target.value)} placeholder="https://facebook.com/..." /></Row>
             <Row label="Instagram URL"><Input value={form.instagram_url ?? ""} onChange={(e) => set("instagram_url", e.target.value)} placeholder="https://instagram.com/..." /></Row>
+            <Row label="TikTok URL">
+              <Input
+                type="url"
+                value={form.tiktok_url ?? ""}
+                onChange={(e) => set("tiktok_url", e.target.value)}
+                placeholder="https://www.tiktok.com/@..."
+              />
+            </Row>
             <Row label="WhatsApp номер"><Input value={form.whatsapp_number ?? ""} onChange={(e) => set("whatsapp_number", e.target.value)} placeholder="+359..." /></Row>
             <Row label="Viber номер"><Input value={form.viber_number ?? ""} onChange={(e) => set("viber_number", e.target.value)} placeholder="+359..." /></Row>
           </div>
@@ -381,5 +389,3 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (<div><Label>{label}</Label><div className="mt-1.5">{children}</div></div>);
 }
-
-

@@ -15,6 +15,7 @@ import {
   Layers,
   Facebook,
   Instagram,
+  Music2,
   MessageCircle,
   Menu,
   X,
@@ -46,6 +47,7 @@ import { type Property, type PropertyType, APARTMENT_LAYOUTS } from "@/data/prop
 import { fetchPublicProperties, usePublicProperties } from "@/hooks/use-public-properties";
 import { useServerFn } from "@tanstack/react-start";
 import { SITE_URL } from "@/lib/seo";
+import { broadenLegacyCoverageText, citySlug, listedCities } from "@/lib/cities";
 
 import { submitInquiry } from "@/lib/inquiries.functions";
 import { ConsentEmbed } from "@/components/consent/ConsentEmbed";
@@ -73,6 +75,11 @@ const viberHref = (n?: string) =>
   `viber://chat?number=%2B${(n ?? "").replace(/[^0-9]/g, "")}`;
 const displayBrandName = (name?: string | null) =>
   (name?.trim() || "Елла Недвижими Имоти").replace(/Елла(?=Недвижими)/u, "Елла ");
+const displayCoverageText = (
+  text: string,
+  translate: (value: string) => string,
+  language: "bg" | "en",
+) => broadenLegacyCoverageText(translate(broadenLegacyCoverageText(text, "bg")), language);
 
 function publicLogoUrl(value?: string | null): string | null {
   if (!value) return null;
@@ -93,8 +100,20 @@ export const Route = createFileRoute("/")({
   },
   head: ({ loaderData }) => {
     const settings = loaderData?.settings ?? DEFAULT_SETTINGS;
-    const title = settings.seo_home_title || DEFAULT_SETTINGS.seo_home_title;
-    const description = settings.seo_home_description || DEFAULT_SETTINGS.seo_home_description;
+    const cities = listedCities(loaderData?.properties ?? []);
+    const locationLabel = cities.join(", ");
+    const title = cities.length
+      ? `Имоти в ${locationLabel} | Елла Недвижими Имоти`
+      : broadenLegacyCoverageText(
+          settings.seo_home_title || DEFAULT_SETTINGS.seo_home_title,
+          "bg",
+        );
+    const description = cities.length
+      ? `Актуални обяви за имоти в ${locationLabel}. Разгледайте офертите за продажба и наем и се свържете с Елла Недвижими Имоти за съдействие.`
+      : broadenLegacyCoverageText(
+          settings.seo_home_description || DEFAULT_SETTINGS.seo_home_description,
+          "bg",
+        );
     return {
       meta: [
       { title },
@@ -122,6 +141,9 @@ export const Route = createFileRoute("/")({
           "@type": "RealEstateAgent",
           name: settings.brand_name,
           url: `${SITE_URL}/`,
+          ...(cities.length
+            ? { areaServed: cities.map((city) => ({ "@type": "City", name: city })) }
+            : {}),
           telephone: [settings.phone1, settings.phone2].filter(Boolean),
           image: new URL(heroImage, SITE_URL).href,
           ...(settings.address ? { address: {
@@ -151,7 +173,7 @@ function HomePage() {
   const settings = useSiteSettings(initialSettings);
   const { language, t } = useLanguage();
   return (
-    <div lang={language} className="min-h-screen bg-background font-sans text-foreground antialiased">
+    <div lang={language} className="pwa-entry min-h-screen bg-background font-sans text-foreground antialiased">
       <BrandStyle primary={settings.primary_color} accent={settings.accent_color} />
       <a
         href="#main"
@@ -306,6 +328,7 @@ function Logo({ settings }: { settings: PublicSettings }) {
 
 function Hero({ settings }: { settings: PublicSettings }) {
   const translate = useTranslateContent();
+  const { language } = useLanguage();
   const stats = [
     { k: settings.stat1_value, v: settings.stat1_label },
     { k: settings.stat2_value, v: settings.stat2_label },
@@ -333,13 +356,13 @@ function Hero({ settings }: { settings: PublicSettings }) {
             <div className="max-w-2xl">
               <span className="inline-flex items-center gap-2 rounded-full border border-gold/40 bg-white/5 px-3 py-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-gold backdrop-blur sm:px-4 sm:text-xs sm:tracking-[0.2em]">
                 <span className="h-1.5 w-1.5 rounded-full bg-gold" />
-                {translate(settings.hero_eyebrow)}
+                {displayCoverageText(settings.hero_eyebrow, translate, language)}
               </span>
               <h1 className="mt-5 font-display text-[2rem] font-medium leading-[1.08] text-white sm:mt-6 sm:text-5xl lg:text-6xl">
                 {translate(settings.hero_title)}
               </h1>
               <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-white/80 sm:mt-6 sm:text-lg">
-                {translate(settings.hero_subtitle)}
+                {displayCoverageText(settings.hero_subtitle, translate, language)}
               </p>
               <div className="mt-7 flex flex-col gap-3 sm:mt-9 sm:flex-row sm:flex-wrap">
                 <Button
@@ -385,7 +408,7 @@ function Hero({ settings }: { settings: PublicSettings }) {
 /* ---------------- About ---------------- */
 
 function About({ settings }: { settings: PublicSettings }) {
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   const translate = useTranslateContent();
   const stats = [
     { k: settings.stat1_value, v: settings.stat1_label },
@@ -403,11 +426,11 @@ function About({ settings }: { settings: PublicSettings }) {
             {translate(settings.about_title)}
           </h2>
           <p className="mt-6 whitespace-pre-line text-lg leading-relaxed text-foreground/75">
-            {translate(settings.about_text)}
+            {displayCoverageText(settings.about_text, translate, language)}
           </p>
           {settings.about_text_secondary && (
             <p className="mt-4 whitespace-pre-line text-base leading-relaxed text-muted-foreground">
-              {translate(settings.about_text_secondary)}
+              {displayCoverageText(settings.about_text_secondary, translate, language)}
             </p>
           )}
         </div>
@@ -494,6 +517,7 @@ function Catalog({ settings, initialProperties }: { settings: PublicSettings; in
   const { language, t } = useLanguage();
   const [type, setType] = useState<string>("Всички");
   const [listing, setListing] = useState<string>("Всички");
+  const [city, setCity] = useState<string>("Всички");
   const [district, setDistrict] = useState<string>("Всички");
   const [layout, setLayout] = useState<string>("Всички");
   const [maxPrice, setMaxPrice] = useState<string>("");
@@ -504,18 +528,20 @@ function Catalog({ settings, initialProperties }: { settings: PublicSettings; in
     () => ["Всички", ...Array.from(new Set(list.map((p) => p.district).filter(Boolean)))],
     [list],
   );
+  const cities = useMemo(() => listedCities(list), [list]);
 
   const filtered = useMemo(() => {
     return list.filter((p) => {
       if (type !== "Всички" && p.type !== type) return false;
       if (listing !== "Всички" && p.listing !== listing) return false;
+      if (city !== "Всички" && p.city !== city) return false;
       if (district !== "Всички" && p.district !== district) return false;
       if (layout !== "Всички" && p.layout !== layout) return false;
       if (maxPrice && p.price > Number(maxPrice)) return false;
       if (minArea && p.area < Number(minArea)) return false;
       return true;
     });
-  }, [list, type, listing, district, layout, maxPrice, minArea]);
+  }, [list, type, listing, city, district, layout, maxPrice, minArea]);
 
   return (
     <section id="catalog" className="bg-background py-16 sm:py-20 lg:py-32">
@@ -524,6 +550,26 @@ function Catalog({ settings, initialProperties }: { settings: PublicSettings; in
         <h2 className="mt-4 font-display text-3xl font-medium text-navy sm:text-4xl md:text-5xl">
           {settings.catalog_title}
         </h2>
+
+        {cities.length > 0 && (
+          <nav aria-label={language === "en" ? "Properties by city" : "Имоти по град"} className="mt-5">
+            <h3 className="text-sm font-medium text-muted-foreground">
+              {language === "en" ? "Browse properties by city" : "Разгледайте имотите по град"}
+            </h3>
+            <ul className="mt-2 flex flex-wrap gap-2">
+              {cities.map((listedCity) => (
+                <li key={listedCity}>
+                  <a
+                    href={`/imoti-v/${citySlug(listedCity)}`}
+                    className="inline-flex rounded-full border border-border px-3 py-1.5 text-sm text-navy transition-colors hover:border-gold hover:bg-gold/10"
+                  >
+                    {language === "en" ? `Properties in ${listedCity}` : `Имоти в ${listedCity}`}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        )}
 
         <div className="mt-8 grid gap-4 rounded-2xl border border-border bg-card p-4 sm:mt-10 sm:p-5 shadow-sm sm:grid-cols-2 lg:grid-cols-6">
           <FilterSelect
@@ -536,6 +582,12 @@ function Catalog({ settings, initialProperties }: { settings: PublicSettings; in
             options={PROPERTY_TYPES as string[]}
           />
           <FilterSelect label={t("home.filter.listing")} value={listing} onChange={setListing} options={["Всички", "Продажба", "Наем"]} />
+          <FilterSelect
+            label={language === "en" ? "City" : "Град"}
+            value={city}
+            onChange={setCity}
+            options={["Всички", ...cities]}
+          />
           {type === "Апартамент" && (
             <FilterSelect label={t("home.filter.layout")} value={layout} onChange={setLayout} options={["Всички", ...APARTMENT_LAYOUTS]} />
           )}
@@ -602,6 +654,7 @@ function Catalog({ settings, initialProperties }: { settings: PublicSettings; in
               onClick={() => {
                 setType("Всички");
                 setListing("Всички");
+                setCity("Всички");
                 setDistrict("Всички");
                 setLayout("Всички");
                 setMaxPrice("");
@@ -738,6 +791,7 @@ function PropertyCard({ p }: { p: Property }) {
 
 function WhyUs({ settings }: { settings: PublicSettings }) {
   const translate = useTranslateContent();
+  const { language } = useLanguage();
   const reasons = settings.why_reasons ?? [];
   return (
     <section id="why" className="relative overflow-hidden bg-navy-deep py-16 text-white sm:py-20 lg:py-32">
@@ -759,7 +813,7 @@ function WhyUs({ settings }: { settings: PublicSettings }) {
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gold font-display text-navy-deep">
                 {String(i + 1).padStart(2, "0")}
               </span>
-              <span className="pt-1.5 text-base font-medium">{translate(r)}</span>
+              <span className="pt-1.5 text-base font-medium">{displayCoverageText(r, translate, language)}</span>
             </div>
           ))}
         </div>
@@ -1046,7 +1100,7 @@ function ContactRow({
 /* ---------------- Footer ---------------- */
 
 function Footer({ settings }: { settings: PublicSettings }) {
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   const translate = useTranslateContent();
   const nav = settings.nav_links ?? [];
   const logoUrl = publicLogoUrl(settings.logo_url) ?? "/ella-imoti-logo.png";
@@ -1075,7 +1129,7 @@ function Footer({ settings }: { settings: PublicSettings }) {
             </span>
           </div>
           <p className="mt-5 text-sm leading-relaxed text-white/65">
-            {translate(settings.footer_description)}
+            {displayCoverageText(settings.footer_description, translate, language)}
           </p>
         </div>
         <div>
@@ -1101,6 +1155,11 @@ function Footer({ settings }: { settings: PublicSettings }) {
           <div className="mt-4 flex gap-3">
             {settings.facebook_url && <SocialLink href={settings.facebook_url} label="Facebook"><Facebook className="h-4 w-4" /></SocialLink>}
             {settings.instagram_url && <SocialLink href={settings.instagram_url} label="Instagram"><Instagram className="h-4 w-4" /></SocialLink>}
+            {settings.tiktok_url && (
+              <SocialLink href={settings.tiktok_url} label="TikTok">
+                <Music2 className="h-4 w-4" />
+              </SocialLink>
+            )}
             {settings.whatsapp_number && <SocialLink href={waHref(settings.whatsapp_number)} label="WhatsApp"><MessageCircle className="h-4 w-4" /></SocialLink>}
           </div>
         </div>

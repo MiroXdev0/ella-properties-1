@@ -60,6 +60,7 @@ export type SettingsRow = {
   address: string | null;
   facebook_url: string | null;
   instagram_url: string | null;
+  tiktok_url: string | null;
   whatsapp_number: string | null;
   viber_number: string | null;
   brand_name: string | null;
@@ -128,7 +129,6 @@ export async function fetchStats() {
     newInquiries: inquiries.count ?? 0,
   };
 }
-
 
 
 

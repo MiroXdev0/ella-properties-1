@@ -289,6 +289,7 @@ export type Database = {
           hero_title: string | null
           id: number
           instagram_url: string | null
+          tiktok_url: string | null
           logo_url: string | null
           nav_links: Json | null
           phone1: string | null
@@ -350,6 +351,7 @@ export type Database = {
           hero_title?: string | null
           id?: number
           instagram_url?: string | null
+          tiktok_url?: string | null
           logo_url?: string | null
           nav_links?: Json | null
           phone1?: string | null
@@ -411,6 +413,7 @@ export type Database = {
           hero_title?: string | null
           id?: number
           instagram_url?: string | null
+          tiktok_url?: string | null
           logo_url?: string | null
           nav_links?: Json | null
           phone1?: string | null
@@ -682,7 +685,6 @@ export const Constants = {
     },
   },
 } as const
-
 
 
 
