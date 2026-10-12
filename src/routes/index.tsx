@@ -25,6 +25,7 @@ import {
   TrendingUp,
   Handshake,
   Briefcase,
+  Clock3,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -63,16 +64,27 @@ import {
 } from "@/hooks/use-site-settings";
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  Home: HomeIcon, Key, Building2, FileText, Award, Shield, Users, TrendingUp,
-  Star, Handshake, Briefcase, MapPin, Phone, Mail, Check,
+  Home: HomeIcon,
+  Key,
+  Building2,
+  FileText,
+  Award,
+  Shield,
+  Users,
+  TrendingUp,
+  Star,
+  Handshake,
+  Briefcase,
+  MapPin,
+  Phone,
+  Mail,
+  Check,
 };
 const iconOf = (name: string) => ICONS[name] ?? HomeIcon;
 
 const telHref = (n?: string) => `tel:${(n ?? "").replace(/\s+/g, "")}`;
-const waHref = (n?: string) =>
-  `https://wa.me/${(n ?? "").replace(/[^0-9]/g, "")}`;
-const viberHref = (n?: string) =>
-  `viber://chat?number=%2B${(n ?? "").replace(/[^0-9]/g, "")}`;
+const waHref = (n?: string) => `https://wa.me/${(n ?? "").replace(/[^0-9]/g, "")}`;
+const viberHref = (n?: string) => `viber://chat?number=%2B${(n ?? "").replace(/[^0-9]/g, "")}`;
 const displayBrandName = (name?: string | null) =>
   (name?.trim() || "Елла Недвижими Имоти").replace(/Елла(?=Недвижими)/u, "Елла ");
 const displayCoverageText = (
@@ -100,69 +112,79 @@ export const Route = createFileRoute("/")({
   },
   head: ({ loaderData }) => {
     const settings = loaderData?.settings ?? DEFAULT_SETTINGS;
+    const shareImage = new URL(publicLogoUrl(settings.og_image_url) ?? heroImage, SITE_URL).href;
     const cities = listedCities(loaderData?.properties ?? []);
     const locationLabel = cities.join(", ");
+    const configuredTitle = broadenLegacyCoverageText(
+      settings.seo_home_title || DEFAULT_SETTINGS.seo_home_title,
+      "bg",
+    );
+    const configuredDescription = broadenLegacyCoverageText(
+      settings.seo_home_description || DEFAULT_SETTINGS.seo_home_description,
+      "bg",
+    );
     const title = cities.length
-      ? `Имоти в ${locationLabel} | Елла Недвижими Имоти`
-      : broadenLegacyCoverageText(
-          settings.seo_home_title || DEFAULT_SETTINGS.seo_home_title,
-          "bg",
-        );
+      ? settings.seo_home_title === DEFAULT_SETTINGS.seo_home_title
+        ? `Имоти в ${locationLabel} | Елла Недвижими Имоти`
+        : `${configuredTitle} — имоти в ${locationLabel}`
+      : configuredTitle;
     const description = cities.length
-      ? `Актуални обяви за имоти в ${locationLabel}. Разгледайте офертите за продажба и наем и се свържете с Елла Недвижими Имоти за съдействие.`
-      : broadenLegacyCoverageText(
-          settings.seo_home_description || DEFAULT_SETTINGS.seo_home_description,
-          "bg",
-        );
+      ? `${configuredDescription} Актуални оферти за имоти в ${locationLabel}.`
+      : configuredDescription;
+    const shareImageAlt = "Елла Недвижими Имоти — недвижими имоти";
     return {
       meta: [
-      { title },
-      {
-        name: "description",
-        content: description,
-      },
-      { property: "og:title", content: title },
-      { property: "og:description", content: description },
-      { property: "og:url", content: `${SITE_URL}/` },
-      { property: "og:image", content: new URL(heroImage, SITE_URL).href },
-      { property: "og:image:alt", content: "Светъл модерен интериор с панорамни прозорци" },
-      { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: title },
-      { name: "twitter:description", content: description },
-      { name: "twitter:image", content: new URL(heroImage, SITE_URL).href },
-      { name: "twitter:image:alt", content: "Светъл модерен интериор с панорамни прозорци" },
-    ],
-    links: [{ rel: "canonical", href: `${SITE_URL}/` }],
-    scripts: [
-      {
-        type: "application/ld+json",
-        children: JSON.stringify({
-          "@context": "https://schema.org",
-          "@type": "RealEstateAgent",
-          name: settings.brand_name,
-          url: `${SITE_URL}/`,
-          ...(cities.length
-            ? { areaServed: cities.map((city) => ({ "@type": "City", name: city })) }
-            : {}),
-          telephone: [settings.phone1, settings.phone2].filter(Boolean),
-          image: new URL(heroImage, SITE_URL).href,
-          ...(settings.address ? { address: {
-            "@type": "PostalAddress",
-            streetAddress: settings.address,
-            addressCountry: "BG",
-          } } : {}),
-        }),
-      },
-      {
-        type: "application/ld+json",
-        children: JSON.stringify({
-          "@context": "https://schema.org",
-          "@type": "WebSite",
-          name: settings.brand_name,
-          url: `${SITE_URL}/`,
-        }),
-      },
-    ],
+        { title },
+        {
+          name: "description",
+          content: description,
+        },
+        { property: "og:title", content: title },
+        { property: "og:description", content: description },
+        { property: "og:url", content: `${SITE_URL}/` },
+        { property: "og:image", content: shareImage },
+        { property: "og:image:alt", content: shareImageAlt },
+        { name: "twitter:card", content: "summary_large_image" },
+        { name: "twitter:title", content: title },
+        { name: "twitter:description", content: description },
+        { name: "twitter:image", content: shareImage },
+        { name: "twitter:image:alt", content: shareImageAlt },
+      ],
+      links: [{ rel: "canonical", href: `${SITE_URL}/` }],
+      scripts: [
+        {
+          type: "application/ld+json",
+          children: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "RealEstateAgent",
+            name: settings.brand_name,
+            url: `${SITE_URL}/`,
+            ...(cities.length
+              ? { areaServed: cities.map((city) => ({ "@type": "City", name: city })) }
+              : {}),
+            telephone: [settings.phone1, settings.phone2].filter(Boolean),
+            image: new URL(heroImage, SITE_URL).href,
+            ...(settings.address
+              ? {
+                  address: {
+                    "@type": "PostalAddress",
+                    streetAddress: settings.address,
+                    addressCountry: "BG",
+                  },
+                }
+              : {}),
+          }),
+        },
+        {
+          type: "application/ld+json",
+          children: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "WebSite",
+            name: settings.brand_name,
+            url: `${SITE_URL}/`,
+          }),
+        },
+      ],
     };
   },
   component: HomePage,
@@ -170,10 +192,13 @@ export const Route = createFileRoute("/")({
 
 function HomePage() {
   const { properties, settings: initialSettings } = Route.useLoaderData();
-  const settings = useSiteSettings(initialSettings);
   const { language, t } = useLanguage();
+  const settings = useSiteSettings(initialSettings, language);
   return (
-    <div lang={language} className="pwa-entry min-h-screen bg-background font-sans text-foreground antialiased">
+    <div
+      lang={language}
+      className="pwa-entry min-h-screen bg-background font-sans text-foreground antialiased"
+    >
       <BrandStyle primary={settings.primary_color} accent={settings.accent_color} />
       <a
         href="#main"
@@ -199,7 +224,10 @@ function HomePage() {
 }
 
 function BrandStyle({ primary, accent }: { primary: string; accent: string }) {
-  const safe = (c: string, d: string) => (/^#[0-9a-fA-F]{3,8}$|^(rgb|hsl|oklch)a?\([0-9.,%\s/a-z-]+\)$/.test(c?.trim() ?? "") ? c.trim() : d);
+  const safe = (c: string, d: string) =>
+    /^#[0-9a-fA-F]{3,8}$|^(rgb|hsl|oklch)a?\([0-9.,%\s/a-z-]+\)$/.test(c?.trim() ?? "")
+      ? c.trim()
+      : d;
   primary = safe(primary, "#0B1E3B");
   accent = safe(accent, "#C9A961");
   const css = `:root{--navy:${primary};--navy-deep:${primary};--gold:${accent};--gold-soft:${accent};}`;
@@ -250,7 +278,11 @@ function Header({ settings }: { settings: PublicSettings }) {
         </nav>
         <LanguageSwitcher className="ml-auto lg:ml-0" />
         <div className="hidden shrink-0 xl:flex">
-          <Button asChild variant="default" className="whitespace-nowrap bg-navy text-white hover:bg-navy-deep">
+          <Button
+            asChild
+            variant="default"
+            className="whitespace-nowrap bg-navy text-white hover:bg-navy-deep"
+          >
             <a href={telHref(settings.phone1)}>
               <Phone className="mr-2 h-4 w-4" />
               {settings.phone1}
@@ -419,7 +451,9 @@ function About({ settings }: { settings: PublicSettings }) {
 
   return (
     <section id="about" className="bg-background py-16 sm:py-20 lg:py-32">
-      <div className={`mx-auto grid max-w-7xl gap-10 px-4 sm:gap-14 sm:px-5 lg:gap-20 lg:px-8 ${stats.length > 0 ? "lg:grid-cols-2" : ""}`}>
+      <div
+        className={`mx-auto grid max-w-7xl gap-10 px-4 sm:gap-14 sm:px-5 lg:gap-20 lg:px-8 ${stats.length > 0 ? "lg:grid-cols-2" : ""}`}
+      >
         <div>
           <SectionEyebrow>{translate(settings.about_eyebrow)}</SectionEyebrow>
           <h2 className="mt-4 font-display text-3xl font-medium text-navy sm:text-4xl md:text-5xl">
@@ -436,17 +470,17 @@ function About({ settings }: { settings: PublicSettings }) {
         </div>
         {stats.length > 0 && (
           <div className="grid grid-cols-2 gap-4 sm:gap-5">
-          {stats.map((c) => (
-            <div
-              key={`${c.k}-${c.v}`}
-              className="rounded-2xl border border-border bg-card p-6 shadow-sm transition-shadow hover:shadow-md"
-            >
-              <div className="font-display text-3xl text-navy">{c.k}</div>
-              <div className="mt-1 text-sm uppercase tracking-[0.15em] text-muted-foreground">
-                {translate(c.v)}
+            {stats.map((c) => (
+              <div
+                key={`${c.k}-${c.v}`}
+                className="rounded-2xl border border-border bg-card p-6 shadow-sm transition-shadow hover:shadow-md"
+              >
+                <div className="font-display text-3xl text-navy">{c.k}</div>
+                <div className="mt-1 text-sm uppercase tracking-[0.15em] text-muted-foreground">
+                  {translate(c.v)}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
           </div>
         )}
       </div>
@@ -469,34 +503,58 @@ function Services({ settings }: { settings: PublicSettings }) {
               {translate(settings.services_title)}
             </h2>
           </div>
-          <p className="max-w-md text-muted-foreground">
-            {translate(settings.services_subtitle)}
-          </p>
+          <p className="max-w-md text-muted-foreground">{translate(settings.services_subtitle)}</p>
         </div>
         <div className="mt-8 grid gap-5 sm:mt-12 sm:grid-cols-2 lg:grid-cols-4">
           {services.map((s) => {
             const Icon = iconOf(s.icon);
             return (
-            <div
-              key={s.title}
-              className="group flex flex-col rounded-2xl border border-border bg-card p-6 transition-all sm:p-7 hover:-translate-y-1 hover:border-gold hover:shadow-xl"
-            >
-              <div className="grid h-12 w-12 place-items-center rounded-xl bg-navy text-gold ring-1 ring-gold/30">
-                <Icon className="h-5 w-5" />
+              <div
+                key={s.title}
+                className="group flex flex-col rounded-2xl border border-border bg-card p-6 transition-all sm:p-7 hover:-translate-y-1 hover:border-gold hover:shadow-xl"
+              >
+                <div className="grid h-12 w-12 place-items-center rounded-xl bg-navy text-gold ring-1 ring-gold/30">
+                  <Icon className="h-5 w-5" />
+                </div>
+                <h3 className="mt-6 font-display text-2xl text-navy">{translate(s.title)}</h3>
+                <ul className="mt-4 space-y-2 text-sm text-foreground/75">
+                  {s.items.map((i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-gold" />
+                      <span>{translate(i)}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
-              <h3 className="mt-6 font-display text-2xl text-navy">{translate(s.title)}</h3>
-              <ul className="mt-4 space-y-2 text-sm text-foreground/75">
-                {s.items.map((i) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-gold" />
-                    <span>{translate(i)}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
             );
           })}
         </div>
+        {settings.services_image_url && (
+          <div className="mt-8 overflow-hidden rounded-2xl bg-white p-3 shadow-sm sm:mt-12 sm:p-6">
+            {settings.services_image_heading.trim() && (
+              <h3 className="mb-4 text-center font-display text-xl font-medium text-navy sm:text-2xl">
+                {translate(settings.services_image_heading)}
+              </h3>
+            )}
+            <a
+              href="https://www.creditnavigator.bg/"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`${translate(settings.services_image_heading) || "Credit Navigator"} — кредитnavigator.bg`}
+              className="group block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-4"
+            >
+              <img
+                src={settings.services_image_url}
+                alt={translate("Кредитен навигатор — съдействие при финансиране на имот")}
+                width={2000}
+                height={650}
+                loading="lazy"
+                decoding="async"
+                className="mx-auto h-auto max-h-[34rem] w-full object-contain transition-opacity duration-200 group-hover:opacity-90"
+              />
+            </a>
+          </div>
+        )}
       </div>
     </section>
   );
@@ -513,7 +571,13 @@ const PROPERTY_TYPES: (PropertyType | "Всички")[] = [
   "Бизнес имот",
 ];
 
-function Catalog({ settings, initialProperties }: { settings: PublicSettings; initialProperties: Property[] }) {
+function Catalog({
+  settings,
+  initialProperties,
+}: {
+  settings: PublicSettings;
+  initialProperties: Property[];
+}) {
   const { language, t } = useLanguage();
   const [type, setType] = useState<string>("Всички");
   const [listing, setListing] = useState<string>("Всички");
@@ -552,7 +616,10 @@ function Catalog({ settings, initialProperties }: { settings: PublicSettings; in
         </h2>
 
         {cities.length > 0 && (
-          <nav aria-label={language === "en" ? "Properties by city" : "Имоти по град"} className="mt-5">
+          <nav
+            aria-label={language === "en" ? "Properties by city" : "Имоти по град"}
+            className="mt-5"
+          >
             <h3 className="text-sm font-medium text-muted-foreground">
               {language === "en" ? "Browse properties by city" : "Разгледайте имотите по град"}
             </h3>
@@ -581,7 +648,12 @@ function Catalog({ settings, initialProperties }: { settings: PublicSettings; in
             }}
             options={PROPERTY_TYPES as string[]}
           />
-          <FilterSelect label={t("home.filter.listing")} value={listing} onChange={setListing} options={["Всички", "Продажба", "Наем"]} />
+          <FilterSelect
+            label={t("home.filter.listing")}
+            value={listing}
+            onChange={setListing}
+            options={["Всички", "Продажба", "Наем"]}
+          />
           <FilterSelect
             label={language === "en" ? "City" : "Град"}
             value={city}
@@ -589,11 +661,26 @@ function Catalog({ settings, initialProperties }: { settings: PublicSettings; in
             options={["Всички", ...cities]}
           />
           {type === "Апартамент" && (
-            <FilterSelect label={t("home.filter.layout")} value={layout} onChange={setLayout} options={["Всички", ...APARTMENT_LAYOUTS]} />
+            <FilterSelect
+              label={t("home.filter.layout")}
+              value={layout}
+              onChange={setLayout}
+              options={["Всички", ...APARTMENT_LAYOUTS]}
+            />
           )}
-          <FilterSelect label={t("home.filter.district")} value={district} onChange={setDistrict} options={districts} />
+          <FilterSelect
+            label={t("home.filter.district")}
+            value={district}
+            onChange={setDistrict}
+            options={districts}
+          />
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="filter-max-price" className="text-xs uppercase tracking-wider text-muted-foreground">{t("home.filter.price")}</Label>
+            <Label
+              htmlFor="filter-max-price"
+              className="text-xs uppercase tracking-wider text-muted-foreground"
+            >
+              {t("home.filter.price")}
+            </Label>
             <Input
               id="filter-max-price"
               type="number"
@@ -604,7 +691,12 @@ function Catalog({ settings, initialProperties }: { settings: PublicSettings; in
             />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="filter-min-area" className="text-xs uppercase tracking-wider text-muted-foreground">{t("home.filter.area")}</Label>
+            <Label
+              htmlFor="filter-min-area"
+              className="text-xs uppercase tracking-wider text-muted-foreground"
+            >
+              {t("home.filter.area")}
+            </Label>
             <Input
               id="filter-min-area"
               type="number"
@@ -627,7 +719,10 @@ function Catalog({ settings, initialProperties }: { settings: PublicSettings; in
         {isLoading ? (
           <div className="mt-4 grid gap-5 sm:gap-7 md:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+              <div
+                key={i}
+                className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
+              >
                 <div className="aspect-[4/3] w-full animate-pulse bg-muted" />
                 <div className="space-y-3 p-6">
                   <div className="h-5 w-2/3 animate-pulse rounded bg-muted" />
@@ -685,7 +780,9 @@ function FilterSelect({
   const translate = useTranslateContent();
   return (
     <div className="flex flex-col gap-1.5">
-      <Label htmlFor={id} className="text-xs uppercase tracking-wider text-muted-foreground">{label}</Label>
+      <Label htmlFor={id} className="text-xs uppercase tracking-wider text-muted-foreground">
+        {label}
+      </Label>
       <Select value={value} onValueChange={onChange}>
         <SelectTrigger id={id} aria-label={label}>
           <SelectValue />
@@ -707,8 +804,18 @@ function PropertyCard({ p }: { p: Property }) {
   const translate = useTranslateContent();
   const priceText = new Intl.NumberFormat(language === "en" ? "en-GB" : "bg-BG").format(p.price);
   return (
-    <article className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all hover:-translate-y-1 hover:shadow-xl">
-      <div className="relative aspect-[4/3] overflow-hidden">
+    <article className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-[transform,box-shadow] hover:-translate-y-1 hover:shadow-xl">
+      <Link
+        to="/properties/$id"
+        params={{ id: p.id }}
+        aria-label={`${t("property.more")}: ${p.title}`}
+        className="absolute inset-0 z-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold"
+      >
+        <span className="sr-only">
+          {t("property.more")}: {p.title}
+        </span>
+      </Link>
+      <div className="pointer-events-none relative z-10 aspect-[4/3] overflow-hidden">
         {p.image ? (
           <img
             src={p.image}
@@ -729,21 +836,31 @@ function PropertyCard({ p }: { p: Property }) {
           {translate(p.type)}
         </span>
       </div>
-      <div className="flex flex-1 flex-col p-6">
+      <div className="pointer-events-none relative z-10 flex flex-1 flex-col p-6">
         <div className="flex items-baseline justify-between gap-3">
           <h3 className="font-display text-xl text-navy">{p.title}</h3>
         </div>
         <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
-          <MapPin className="h-3.5 w-3.5" /> {p.city}{p.district ? `, ${p.district}` : ""}
+          <MapPin className="h-3.5 w-3.5" /> {p.city}
+          {p.district ? `, ${p.district}` : ""}
         </p>
         <p className="mt-3 line-clamp-2 text-sm text-foreground/75">{p.description}</p>
         <div className="mt-5 flex flex-wrap gap-4 border-t border-border pt-4 text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-1.5">
             <Maximize2 className="h-3.5 w-3.5 text-gold" /> {p.area} м²
           </span>
+          {p.yardArea != null && (
+            <span className="inline-flex items-center gap-1.5">
+              <Maximize2 className="h-3.5 w-3.5 text-gold" /> {t("property.yardArea")}: {p.yardArea}{" "}
+              м²
+            </span>
+          )}
           {p.floor && (
             <span className="inline-flex items-center gap-1.5">
-              <Layers className="h-3.5 w-3.5 text-gold" /> {p.type === "Къща" ? t("property.storiesHouse").replace("{count}", p.floor) : t("property.floorValue").replace("{floor}", p.floor)}
+              <Layers className="h-3.5 w-3.5 text-gold" />{" "}
+              {p.type === "Къща"
+                ? t("property.storiesHouse").replace("{count}", p.floor)
+                : t("property.floorValue").replace("{floor}", p.floor)}
             </span>
           )}
           {p.layout && (
@@ -754,7 +871,9 @@ function PropertyCard({ p }: { p: Property }) {
         </div>
         <div className="mt-5 flex items-end justify-between gap-3">
           <div>
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">{t("property.price")}</div>
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+              {t("property.price")}
+            </div>
             <div className="font-display text-2xl font-medium text-navy">
               € {priceText}
               {p.listing === "Наем" && (
@@ -762,13 +881,8 @@ function PropertyCard({ p }: { p: Property }) {
               )}
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button
-              asChild
-              variant="outline"
-              size="sm"
-              className="rounded-full"
-            >
+          <div className="pointer-events-auto relative z-10 flex gap-2">
+            <Button asChild variant="outline" size="sm" className="min-h-11 rounded-full">
               <Link to="/properties/$id" params={{ id: p.id }}>
                 {t("property.more")}
               </Link>
@@ -776,7 +890,7 @@ function PropertyCard({ p }: { p: Property }) {
             <Button
               asChild
               size="sm"
-              className="rounded-full bg-navy text-white hover:bg-navy-deep"
+              className="min-h-11 rounded-full bg-navy text-white hover:bg-navy-deep"
             >
               <a href="#contact">{t("property.viewing")}</a>
             </Button>
@@ -794,11 +908,18 @@ function WhyUs({ settings }: { settings: PublicSettings }) {
   const { language } = useLanguage();
   const reasons = settings.why_reasons ?? [];
   return (
-    <section id="why" className="relative overflow-hidden bg-navy-deep py-16 text-white sm:py-20 lg:py-32">
-      <div className="absolute inset-0 opacity-[0.08]" style={{
-        backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.6) 1px, transparent 0)",
-        backgroundSize: "32px 32px",
-      }} />
+    <section
+      id="why"
+      className="relative overflow-hidden bg-navy-deep py-16 text-white sm:py-20 lg:py-32"
+    >
+      <div
+        className="absolute inset-0 opacity-[0.08]"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.6) 1px, transparent 0)",
+          backgroundSize: "32px 32px",
+        }}
+      />
       <div className="relative mx-auto max-w-7xl px-4 sm:px-5 lg:px-8">
         <SectionEyebrow tone="gold">{translate(settings.why_eyebrow)}</SectionEyebrow>
         <h2 className="mt-4 max-w-3xl font-display text-3xl font-medium sm:text-4xl md:text-5xl">
@@ -813,7 +934,9 @@ function WhyUs({ settings }: { settings: PublicSettings }) {
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gold font-display text-navy-deep">
                 {String(i + 1).padStart(2, "0")}
               </span>
-              <span className="pt-1.5 text-base font-medium">{displayCoverageText(r, translate, language)}</span>
+              <span className="pt-1.5 text-base font-medium">
+                {displayCoverageText(r, translate, language)}
+              </span>
             </div>
           ))}
         </div>
@@ -864,8 +987,9 @@ function Testimonials({ settings }: { settings: PublicSettings }) {
 /* ---------------- Contact ---------------- */
 
 function Contact({ settings }: { settings: PublicSettings }) {
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   const translate = useTranslateContent();
+  const workingHours = settings.working_hours[language].trim();
   const [form, setForm] = useState({ name: "", phone: "", email: "", message: "", website: "" });
   const [sending, setSending] = useState(false);
   const [startedAt] = useState(() => Date.now());
@@ -899,9 +1023,7 @@ function Contact({ settings }: { settings: PublicSettings }) {
       });
       if (!res.ok) {
         toast.error(
-          res.reason === "rate_limited"
-            ? t("contact.rateLimited")
-            : t("contact.sendError"),
+          res.reason === "rate_limited" ? t("contact.rateLimited") : t("contact.sendError"),
         );
         return;
       }
@@ -919,7 +1041,9 @@ function Contact({ settings }: { settings: PublicSettings }) {
       <div className="mx-auto max-w-7xl px-4 sm:px-5 lg:px-8">
         <div className="max-w-2xl">
           <SectionEyebrow>{translate(settings.contact_eyebrow)}</SectionEyebrow>
-          <h2 className="mt-4 font-display text-3xl font-medium text-navy sm:text-4xl md:text-5xl">{translate(settings.contact_title)}</h2>
+          <h2 className="mt-4 font-display text-3xl font-medium text-navy sm:text-4xl md:text-5xl">
+            {translate(settings.contact_title)}
+          </h2>
           <p className="mt-4 text-muted-foreground">{translate(settings.contact_subtitle)}</p>
         </div>
 
@@ -929,16 +1053,18 @@ function Contact({ settings }: { settings: PublicSettings }) {
               icon={Phone}
               title={t("contact.phones")}
               lines={[
-                ...(settings.phone1 ? [{ text: settings.phone1, href: telHref(settings.phone1) }] : []),
-                ...(settings.phone2 ? [{ text: settings.phone2, href: telHref(settings.phone2) }] : []),
+                ...(settings.phone1
+                  ? [{ text: settings.phone1, href: telHref(settings.phone1) }]
+                  : []),
+                ...(settings.phone2
+                  ? [{ text: settings.phone2, href: telHref(settings.phone2) }]
+                  : []),
               ]}
             />
             <ContactRow
               icon={MapPin}
               title={t("contact.address")}
-              lines={[
-                { text: settings.address, href: settings.contact_map_url || undefined },
-              ]}
+              lines={[{ text: settings.address, href: settings.contact_map_url || undefined }]}
             />
             {settings.email && (
               <ContactRow
@@ -947,20 +1073,33 @@ function Contact({ settings }: { settings: PublicSettings }) {
                 lines={[{ text: settings.email, href: `mailto:${settings.email}` }]}
               />
             )}
-            {settings.contact_map_embed?.startsWith("https://") && (
-            <div className="overflow-hidden rounded-2xl border border-border shadow-sm">
-              <ConsentEmbed service="Google Maps" fallbackHref={settings.contact_map_url || undefined}>
-              <iframe
-                title={translate("Карта — Елла Недвижими Имоти")}
-                src={settings.contact_map_embed}
-                width="100%"
-                height="280"
-                style={{ border: 0 }}
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
+            {workingHours && (
+              <ContactRow
+                icon={Clock3}
+                title={language === "en" ? "Working hours" : "Работно време"}
+                lines={workingHours
+                  .split("\n")
+                  .filter(Boolean)
+                  .map((text) => ({ text }))}
               />
-              </ConsentEmbed>
-            </div>
+            )}
+            {settings.contact_map_embed?.startsWith("https://") && (
+              <div className="overflow-hidden rounded-2xl border border-border shadow-sm">
+                <ConsentEmbed
+                  service="Google Maps"
+                  fallbackHref={settings.contact_map_url || undefined}
+                >
+                  <iframe
+                    title={translate("Карта — Елла Недвижими Имоти")}
+                    src={settings.contact_map_embed}
+                    width="100%"
+                    height="280"
+                    style={{ border: 0 }}
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                  />
+                </ConsentEmbed>
+              </div>
             )}
           </div>
 
@@ -982,14 +1121,36 @@ function Contact({ settings }: { settings: PublicSettings }) {
               />
             </div>
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field label="Име *" value={form.name} onChange={(v) => update("name", v)} required autoComplete="name" />
-              <Field label="Телефон *" value={form.phone} onChange={(v) => update("phone", v)} type="tel" required autoComplete="tel" />
+              <Field
+                label="Име *"
+                value={form.name}
+                onChange={(v) => update("name", v)}
+                required
+                autoComplete="name"
+              />
+              <Field
+                label="Телефон *"
+                value={form.phone}
+                onChange={(v) => update("phone", v)}
+                type="tel"
+                required
+                autoComplete="tel"
+              />
               <div className="sm:col-span-2">
-                <Field label="Имейл" value={form.email} onChange={(v) => update("email", v)} type="email" autoComplete="email" />
+                <Field
+                  label="Имейл"
+                  value={form.email}
+                  onChange={(v) => update("email", v)}
+                  type="email"
+                  autoComplete="email"
+                />
               </div>
               <div className="sm:col-span-2 flex flex-col gap-1.5">
-                  <Label htmlFor="contact-message" className="text-xs uppercase tracking-wider text-muted-foreground">
-                    {t("contact.message")}
+                <Label
+                  htmlFor="contact-message"
+                  className="text-xs uppercase tracking-wider text-muted-foreground"
+                >
+                  {t("contact.message")}
                 </Label>
                 <Textarea
                   id="contact-message"
@@ -1017,7 +1178,10 @@ function Contact({ settings }: { settings: PublicSettings }) {
             </Button>
             <p className="mt-4 text-xs text-muted-foreground">
               {t("contact.privacyPrefix")}{" "}
-              <Link to="/privacy" className="underline underline-offset-2 hover:text-foreground">{t("contact.privacy")}</Link>.
+              <Link to="/privacy" className="underline underline-offset-2 hover:text-foreground">
+                {t("contact.privacy")}
+              </Link>
+              .
             </p>
           </form>
         </div>
@@ -1045,7 +1209,9 @@ function Field({
   const translate = useTranslateContent();
   return (
     <div className="flex flex-col gap-1.5">
-      <Label htmlFor={id} className="text-xs uppercase tracking-wider text-muted-foreground">{translate(label)}</Label>
+      <Label htmlFor={id} className="text-xs uppercase tracking-wider text-muted-foreground">
+        {translate(label)}
+      </Label>
       <Input
         id={id}
         type={type}
@@ -1088,7 +1254,9 @@ function ContactRow({
                 {l.text}
               </a>
             ) : (
-              <div key={i} className="text-sm text-foreground/70">{l.text}</div>
+              <div key={i} className="text-sm text-foreground/70">
+                {l.text}
+              </div>
             ),
           )}
         </div>
@@ -1105,7 +1273,10 @@ function Footer({ settings }: { settings: PublicSettings }) {
   const nav = settings.nav_links ?? [];
   const logoUrl = publicLogoUrl(settings.logo_url) ?? "/ella-imoti-logo.png";
   const brandName = displayBrandName(settings.brand_name);
-  const copyright = (settings.footer_copyright || "").replace("{year}", String(new Date().getFullYear()));
+  const copyright = (settings.footer_copyright || "").replace(
+    "{year}",
+    String(new Date().getFullYear()),
+  );
   return (
     <footer className="border-t border-border bg-navy-deep text-white/80">
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-5 sm:py-14 sm:grid-cols-2 lg:grid-cols-4 lg:px-8">
@@ -1137,7 +1308,9 @@ function Footer({ settings }: { settings: PublicSettings }) {
           <ul className="mt-4 space-y-2 text-sm">
             {nav.map((n) => (
               <li key={n.href}>
-                <a href={n.href} className="hover:text-gold">{translate(n.label)}</a>
+                <a href={n.href} className="hover:text-gold">
+                  {translate(n.label)}
+                </a>
               </li>
             ))}
           </ul>
@@ -1145,40 +1318,98 @@ function Footer({ settings }: { settings: PublicSettings }) {
         <div>
           <h2 className="font-display text-base text-gold">{t("footer.contact")}</h2>
           <ul className="mt-4 space-y-2 text-sm">
-            {settings.phone1 && <li><a href={telHref(settings.phone1)} className="hover:text-gold">{settings.phone1}</a></li>}
-            {settings.phone2 && <li><a href={telHref(settings.phone2)} className="hover:text-gold">{settings.phone2}</a></li>}
-            {settings.address && <li><a href={settings.contact_map_url || "#"} target="_blank" rel="noreferrer" className="hover:text-gold">{settings.address}</a></li>}
+            {settings.phone1 && (
+              <li>
+                <a href={telHref(settings.phone1)} className="hover:text-gold">
+                  {settings.phone1}
+                </a>
+              </li>
+            )}
+            {settings.phone2 && (
+              <li>
+                <a href={telHref(settings.phone2)} className="hover:text-gold">
+                  {settings.phone2}
+                </a>
+              </li>
+            )}
+            {settings.address && (
+              <li>
+                <a
+                  href={settings.contact_map_url || "#"}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="hover:text-gold"
+                >
+                  {settings.address}
+                </a>
+              </li>
+            )}
           </ul>
         </div>
         <div>
           <h2 className="font-display text-base text-gold">{t("footer.social")}</h2>
           <div className="mt-4 flex gap-3">
-            {settings.facebook_url && <SocialLink href={settings.facebook_url} label="Facebook"><Facebook className="h-4 w-4" /></SocialLink>}
-            {settings.instagram_url && <SocialLink href={settings.instagram_url} label="Instagram"><Instagram className="h-4 w-4" /></SocialLink>}
+            {settings.facebook_url && (
+              <SocialLink href={settings.facebook_url} label="Facebook">
+                <Facebook className="h-4 w-4" />
+              </SocialLink>
+            )}
+            {settings.instagram_url && (
+              <SocialLink href={settings.instagram_url} label="Instagram">
+                <Instagram className="h-4 w-4" />
+              </SocialLink>
+            )}
             {settings.tiktok_url && (
               <SocialLink href={settings.tiktok_url} label="TikTok">
                 <Music2 className="h-4 w-4" />
               </SocialLink>
             )}
-            {settings.whatsapp_number && <SocialLink href={waHref(settings.whatsapp_number)} label="WhatsApp"><MessageCircle className="h-4 w-4" /></SocialLink>}
+            {settings.whatsapp_number && (
+              <SocialLink href={waHref(settings.whatsapp_number)} label="WhatsApp">
+                <MessageCircle className="h-4 w-4" />
+              </SocialLink>
+            )}
           </div>
         </div>
       </div>
       <div className="border-t border-white/10 px-6 pb-24 pt-6 sm:px-6 sm:pb-6">
-        <nav aria-label={t("legal.navLabel")} className="mx-auto mb-3 flex max-w-3xl flex-wrap justify-center gap-x-5 gap-y-2 text-xs text-white/75">
-          <Link to="/privacy" className="hover:text-gold">{t("footer.privacy")}</Link>
-          <Link to="/cookies" className="hover:text-gold">{t("footer.cookies")}</Link>
-          <Link to="/terms" className="hover:text-gold">{t("footer.terms")}</Link>
-          <Link to="/data-request" className="hover:text-gold">{t("footer.dataRights")}</Link>
-          <button type="button" onClick={openCookiePreferences} className="hover:text-gold">{t("footer.cookieSettings")}</button>
+        <nav
+          aria-label={t("legal.navLabel")}
+          className="mx-auto mb-3 flex max-w-3xl flex-wrap justify-center gap-x-5 gap-y-2 text-xs text-white/75"
+        >
+          <Link to="/privacy" className="hover:text-gold">
+            {t("footer.privacy")}
+          </Link>
+          <Link to="/cookies" className="hover:text-gold">
+            {t("footer.cookies")}
+          </Link>
+          <Link to="/terms" className="hover:text-gold">
+            {t("footer.terms")}
+          </Link>
+          <Link to="/data-request" className="hover:text-gold">
+            {t("footer.dataRights")}
+          </Link>
+          <button type="button" onClick={openCookiePreferences} className="hover:text-gold">
+            {t("footer.cookieSettings")}
+          </button>
         </nav>
-        <p className="mx-auto max-w-[15rem] text-center text-xs leading-relaxed text-white/70 sm:max-w-md">{copyright}</p>
+        <p className="mx-auto max-w-[15rem] text-center text-xs leading-relaxed text-white/70 sm:max-w-md">
+          {copyright}
+        </p>
       </div>
     </footer>
   );
 }
 
-function SocialLink({ href, label, children }: { href: string; label: string; children: React.ReactNode }) {
+function SocialLink({
+  href,
+  label,
+  children,
+}: {
+  href: string;
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <a
       href={href}
@@ -1198,14 +1429,22 @@ function FloatingContacts({ settings }: { settings: PublicSettings }) {
   return (
     <div className="fixed bottom-4 right-4 z-40 sm:bottom-5 sm:right-5 flex flex-col gap-3">
       {settings.whatsapp_number && (
-      <FloatBtn href={waHref(settings.whatsapp_number)} label="WhatsApp" className="bg-[#25D366] hover:brightness-110">
-        <MessageCircle className="h-6 w-6" />
-      </FloatBtn>
+        <FloatBtn
+          href={waHref(settings.whatsapp_number)}
+          label="WhatsApp"
+          className="bg-[#25D366] hover:brightness-110"
+        >
+          <MessageCircle className="h-6 w-6" />
+        </FloatBtn>
       )}
       {settings.viber_number && (
-      <FloatBtn href={viberHref(settings.viber_number)} label="Viber" className="bg-[#7360F2] hover:brightness-110">
-        <Phone className="h-5 w-5" />
-      </FloatBtn>
+        <FloatBtn
+          href={viberHref(settings.viber_number)}
+          label="Viber"
+          className="bg-[#7360F2] hover:brightness-110"
+        >
+          <Phone className="h-5 w-5" />
+        </FloatBtn>
       )}
     </div>
   );

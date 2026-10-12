@@ -1,7 +1,7 @@
 
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { UserCheck, UserX, UserPlus } from "lucide-react";
@@ -30,6 +30,7 @@ export const Route = createFileRoute("/_authenticated/admin/users")({
 });
 
 function UsersAdmin() {
+  const queryClient = useQueryClient();
   const [allow, setAllow] = useState(false);
   const [saving, setSaving] = useState(false);
   const [email, setEmail] = useState("");
@@ -87,10 +88,10 @@ function UsersAdmin() {
       setPassword("");
       setName("");
       setRole("editor");
-      refetch();
-      // refetch roles list
-      void supabase.from("user_roles").select("user_id");
-      window.location.reload();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-users-roles"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-users-profiles"] }),
+      ]);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Грешка при създаване");
     } finally {

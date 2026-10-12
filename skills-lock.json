@@ -1,6 +1,18 @@
 {
   "version": 1,
   "skills": {
+    "core-design": {
+      "source": "inhaq/core-design-skills",
+      "sourceType": "github",
+      "skillPath": "skills/core-design/SKILL.md",
+      "computedHash": "269db0d519bf3e2233daef078f4fe7a9d51cc4f33873f54f875729dc774476a0"
+    },
+    "premium-frontend-ui": {
+      "source": "github/awesome-copilot",
+      "sourceType": "github",
+      "skillPath": "skills/premium-frontend-ui/SKILL.md",
+      "computedHash": "e7f3d02a0233beafdd6fe5335427388109b9699ebcdc6a8782a8bada2826d916"
+    },
     "supabase": {
       "source": "supabase/agent-skills",
       "sourceType": "github",

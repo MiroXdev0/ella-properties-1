@@ -20,6 +20,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PropertiesIdRouteImport } from './routes/properties.$id'
+import { Route as PagesSlugRouteImport } from './routes/pages.$slug'
 import { Route as ImotiVSlugRouteImport } from './routes/imoti-v.$slug'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
@@ -27,6 +28,7 @@ import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authentic
 import { Route as AuthenticatedAdminTeamRouteImport } from './routes/_authenticated/admin.team'
 import { Route as AuthenticatedAdminSettingsRouteImport } from './routes/_authenticated/admin.settings'
 import { Route as AuthenticatedAdminPropertiesRouteImport } from './routes/_authenticated/admin.properties'
+import { Route as AuthenticatedAdminPagesRouteImport } from './routes/_authenticated/admin.pages'
 import { Route as AuthenticatedAdminInquiriesRouteImport } from './routes/_authenticated/admin.inquiries'
 import { Route as ApiPublicMediaSplatRouteImport } from './routes/api/public/media.$'
 
@@ -84,6 +86,11 @@ const PropertiesIdRoute = PropertiesIdRouteImport.update({
   path: '/properties/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PagesSlugRoute = PagesSlugRouteImport.update({
+  id: '/pages/$slug',
+  path: '/pages/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ImotiVSlugRoute = ImotiVSlugRouteImport.update({
   id: '/imoti-v/$slug',
   path: '/imoti-v/$slug',
@@ -121,6 +128,11 @@ const AuthenticatedAdminPropertiesRoute =
     path: '/properties',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminPagesRoute = AuthenticatedAdminPagesRouteImport.update({
+  id: '/pages',
+  path: '/pages',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
 const AuthenticatedAdminInquiriesRoute =
   AuthenticatedAdminInquiriesRouteImport.update({
     id: '/inquiries',
@@ -145,8 +157,10 @@ export interface FileRoutesByFullPath {
   '/terms': typeof TermsRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/imoti-v/$slug': typeof ImotiVSlugRoute
+  '/pages/$slug': typeof PagesSlugRoute
   '/properties/$id': typeof PropertiesIdRoute
   '/admin/inquiries': typeof AuthenticatedAdminInquiriesRoute
+  '/admin/pages': typeof AuthenticatedAdminPagesRoute
   '/admin/properties': typeof AuthenticatedAdminPropertiesRoute
   '/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/admin/team': typeof AuthenticatedAdminTeamRoute
@@ -165,8 +179,10 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
   '/imoti-v/$slug': typeof ImotiVSlugRoute
+  '/pages/$slug': typeof PagesSlugRoute
   '/properties/$id': typeof PropertiesIdRoute
   '/admin/inquiries': typeof AuthenticatedAdminInquiriesRoute
+  '/admin/pages': typeof AuthenticatedAdminPagesRoute
   '/admin/properties': typeof AuthenticatedAdminPropertiesRoute
   '/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/admin/team': typeof AuthenticatedAdminTeamRoute
@@ -188,8 +204,10 @@ export interface FileRoutesById {
   '/terms': typeof TermsRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/imoti-v/$slug': typeof ImotiVSlugRoute
+  '/pages/$slug': typeof PagesSlugRoute
   '/properties/$id': typeof PropertiesIdRoute
   '/_authenticated/admin/inquiries': typeof AuthenticatedAdminInquiriesRoute
+  '/_authenticated/admin/pages': typeof AuthenticatedAdminPagesRoute
   '/_authenticated/admin/properties': typeof AuthenticatedAdminPropertiesRoute
   '/_authenticated/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/_authenticated/admin/team': typeof AuthenticatedAdminTeamRoute
@@ -211,8 +229,10 @@ export interface FileRouteTypes {
     | '/terms'
     | '/admin'
     | '/imoti-v/$slug'
+    | '/pages/$slug'
     | '/properties/$id'
     | '/admin/inquiries'
+    | '/admin/pages'
     | '/admin/properties'
     | '/admin/settings'
     | '/admin/team'
@@ -231,8 +251,10 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/terms'
     | '/imoti-v/$slug'
+    | '/pages/$slug'
     | '/properties/$id'
     | '/admin/inquiries'
+    | '/admin/pages'
     | '/admin/properties'
     | '/admin/settings'
     | '/admin/team'
@@ -253,8 +275,10 @@ export interface FileRouteTypes {
     | '/terms'
     | '/_authenticated/admin'
     | '/imoti-v/$slug'
+    | '/pages/$slug'
     | '/properties/$id'
     | '/_authenticated/admin/inquiries'
+    | '/_authenticated/admin/pages'
     | '/_authenticated/admin/properties'
     | '/_authenticated/admin/settings'
     | '/_authenticated/admin/team'
@@ -275,6 +299,7 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TermsRoute: typeof TermsRoute
   ImotiVSlugRoute: typeof ImotiVSlugRoute
+  PagesSlugRoute: typeof PagesSlugRoute
   PropertiesIdRoute: typeof PropertiesIdRoute
   ApiPublicMediaSplatRoute: typeof ApiPublicMediaSplatRoute
 }
@@ -358,6 +383,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PropertiesIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/pages/$slug': {
+      id: '/pages/$slug'
+      path: '/pages/$slug'
+      fullPath: '/pages/$slug'
+      preLoaderRoute: typeof PagesSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/imoti-v/$slug': {
       id: '/imoti-v/$slug'
       path: '/imoti-v/$slug'
@@ -407,6 +439,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminPropertiesRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/pages': {
+      id: '/_authenticated/admin/pages'
+      path: '/pages'
+      fullPath: '/admin/pages'
+      preLoaderRoute: typeof AuthenticatedAdminPagesRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/inquiries': {
       id: '/_authenticated/admin/inquiries'
       path: '/inquiries'
@@ -426,6 +465,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminInquiriesRoute: typeof AuthenticatedAdminInquiriesRoute
+  AuthenticatedAdminPagesRoute: typeof AuthenticatedAdminPagesRoute
   AuthenticatedAdminPropertiesRoute: typeof AuthenticatedAdminPropertiesRoute
   AuthenticatedAdminSettingsRoute: typeof AuthenticatedAdminSettingsRoute
   AuthenticatedAdminTeamRoute: typeof AuthenticatedAdminTeamRoute
@@ -435,6 +475,7 @@ interface AuthenticatedAdminRouteChildren {
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminInquiriesRoute: AuthenticatedAdminInquiriesRoute,
+  AuthenticatedAdminPagesRoute: AuthenticatedAdminPagesRoute,
   AuthenticatedAdminPropertiesRoute: AuthenticatedAdminPropertiesRoute,
   AuthenticatedAdminSettingsRoute: AuthenticatedAdminSettingsRoute,
   AuthenticatedAdminTeamRoute: AuthenticatedAdminTeamRoute,
@@ -468,6 +509,7 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   TermsRoute: TermsRoute,
   ImotiVSlugRoute: ImotiVSlugRoute,
+  PagesSlugRoute: PagesSlugRoute,
   PropertiesIdRoute: PropertiesIdRoute,
   ApiPublicMediaSplatRoute: ApiPublicMediaSplatRoute,
 }

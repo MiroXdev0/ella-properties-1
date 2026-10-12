@@ -18,12 +18,14 @@ export const en: Record<keyof typeof bg, string> = {
   "nav.backHome": "Back to homepage",
   "home.hero.eyebrow": "Real Estate Agency",
   "home.hero.title": "Your trusted partner in real estate",
-  "home.hero.subtitle": "Ella Real Estate provides professional assistance with buying, selling, and renting properties.",
+  "home.hero.subtitle":
+    "Ella Real Estate provides professional assistance with buying, selling, and renting properties.",
   "home.hero.cta": "Browse properties",
   "home.hero.contact": "Contact us",
   "home.about": "About Us",
   "home.about.title": "Properties selected with attention to detail",
-  "home.about.text": "Ella Real Estate offers a full range of professional real estate services. We help our clients make confident, informed decisions when buying, selling, or renting properties in cities with current listings.",
+  "home.about.text":
+    "Ella Real Estate offers a full range of professional real estate services. We help our clients make confident, informed decisions when buying, selling, or renting properties in cities with current listings.",
   "home.services": "Our Services",
   "home.catalog": "Property Listings",
   "home.catalog.title": "Featured Properties",
@@ -49,7 +51,8 @@ export const en: Record<keyof typeof bg, string> = {
   "home.contact.title": "Let's talk about your property",
   "home.contact.subtitle": "Get in touch in the way that suits you, or send us an enquiry.",
   "home.services.defaultTitle": "Guidance at every step",
-  "home.services.defaultSubtitle": "From the first consultation to signing before a notary, we are with you at every step of the transaction.",
+  "home.services.defaultSubtitle":
+    "From the first consultation to signing before a notary, we are with you at every step of the transaction.",
   "home.service.sell": "Property sales",
   "home.service.buy": "Property purchases",
   "home.service.rent": "Rentals",
@@ -78,13 +81,16 @@ export const en: Record<keyof typeof bg, string> = {
   "home.about.defaultEyebrow": "About Us",
   "home.hero.defaultEyebrow": "Real estate agency",
   "home.hero.defaultTitle": "Properties chosen with care. Transactions guided by trust.",
-  "home.hero.defaultSubtitle": "Ella Real Estate assists with buying, selling, and renting properties in cities with current listings.",
+  "home.hero.defaultSubtitle":
+    "Ella Real Estate assists with buying, selling, and renting properties in cities with current listings.",
   "home.hero.defaultCta": "Browse properties",
   "home.hero.defaultContact": "Contact us",
   "home.about.defaultTitle": "Properties selected with attention to detail",
-  "home.about.defaultText": "Ella Real Estate offers a full range of professional real estate services. We help our clients make confident, informed decisions when buying, selling, or renting properties in cities with current listings.",
+  "home.about.defaultText":
+    "Ella Real Estate offers a full range of professional real estate services. We help our clients make confident, informed decisions when buying, selling, or renting properties in cities with current listings.",
   "home.services.defaultEyebrow": "Our services",
-  "home.services.defaultSubtitleExact": "From the first consultation to signing before a notary, we are with you at every step of the transaction.",
+  "home.services.defaultSubtitleExact":
+    "From the first consultation to signing before a notary, we are with you at every step of the transaction.",
   "home.why.defaultEyebrow": "Why choose us",
   "home.why.defaultTitle": "Trust built on results",
   "home.why.defaultReasonPersonal": "Professional, personal service",
@@ -92,7 +98,8 @@ export const en: Record<keyof typeof bg, string> = {
   "home.why.defaultReasonTransparency": "Transparency, integrity, and discretion",
   "home.why.defaultReasonIndividual": "A tailored approach for every client",
   "home.why.defaultReasonSupport": "Support throughout every stage of the transaction",
-  "home.footer.description": "Current property listings and information about Ella Real Estate services.",
+  "home.footer.description":
+    "Current property listings and information about Ella Real Estate services.",
   "home.contact.defaultTitle": "Let's talk about your property",
   "home.contact.defaultSubtitle": "Get in touch in the way that suits you, or send us an enquiry.",
   "home.contact.defaultPhones": "Phone",
@@ -117,6 +124,7 @@ export const en: Record<keyof typeof bg, string> = {
   "property.more": "View details",
   "property.viewing": "Request a viewing",
   "property.area": "Area",
+  "property.yardArea": "Yard",
   "property.floors": "Floors",
   "property.floor": "Floor",
   "property.layout": "Layout",
@@ -126,7 +134,8 @@ export const en: Record<keyof typeof bg, string> = {
   "property.location": "Location",
   "property.back": "Back to properties",
   "property.notFound": "Property not found",
-  "property.notFoundDescription": "This listing may no longer be available. Browse our other properties.",
+  "property.notFoundDescription":
+    "This listing may no longer be available. Browse our other properties.",
   "property.allProperties": "Browse properties",
   "property.contactForInfo": "Contact us for full details about this property.",
   "property.contactPrompt": "Request a viewing or ask for more information — we respond promptly.",
@@ -141,7 +150,8 @@ export const en: Record<keyof typeof bg, string> = {
   "contact.tellUs": "Tell us what you are looking for...",
   "contact.sending": "Sending...",
   "contact.send": "Send enquiry",
-  "contact.privacyPrefix": "We use your information only to respond to your enquiry. Read more in our",
+  "contact.privacyPrefix":
+    "We use your information only to respond to your enquiry. Read more in our",
   "contact.privacy": "Privacy Policy",
   "contact.required": "Please complete all required fields.",
   "contact.invalidPhone": "Please enter a valid phone number.",
@@ -183,8 +193,7 @@ export const en: Record<keyof typeof bg, string> = {
   "auth.welcome": "Welcome!",
   "auth.noAdminRole":
     "You signed in successfully, but this account has no admin or editor role. Ask the site owner to grant access.",
-  "auth.roleCheckFailed":
-    "We couldn't verify this account's access. Please try again.",
+  "auth.roleCheckFailed": "We couldn't verify this account's access. Please try again.",
   "auth.genericError": "Something went wrong",
   "auth.invalidEmail": "Invalid email address",
   "auth.emailTooLong": "Email address is too long",
@@ -198,9 +207,12 @@ export const en: Record<keyof typeof bg, string> = {
   "reset.checking": "Checking your password recovery link...",
   "reset.invalid": "This password recovery link is invalid or has expired. Request a new link.",
   "reset.requestNewLink": "Request a new link",
-  "request.intro": "Use this form to request access to, correction, deletion, or export of your data, or to withdraw consent. Requests are reviewed manually by a member of our staff. We will verify your identity before acting on your request and respond within one month. The form does not fulfil requests automatically.",
-  "request.cookiesNote": "You can withdraw cookie consent immediately using “Cookie settings” at the bottom of the page.",
-  "request.done": "Your request has been received. We will contact you at the email address provided.",
+  "request.intro":
+    "Use this form to request access to, correction, deletion, or export of your data, or to withdraw consent. Requests are reviewed manually by a member of our staff. We will verify your identity before acting on your request and respond within one month. The form does not fulfil requests automatically.",
+  "request.cookiesNote":
+    "You can withdraw cookie consent immediately using “Cookie settings” at the bottom of the page.",
+  "request.done":
+    "Your request has been received. We will contact you at the email address provided.",
   "request.error": "Something went wrong. Please try again or contact us by phone.",
   "request.rate": "Too many requests. Please try again later.",
   "request.type": "Request type",
@@ -223,24 +235,28 @@ export const en: Record<keyof typeof bg, string> = {
   "property.videoTitle": "Property video",
   "property.mapTitle": "Property map",
   "consent.title": "Your privacy",
-  "consent.description": "We use only essential local storage to make the website work. Maps and videos from external services (Google Maps, YouTube, Vimeo) may use cookies and load only with your consent. We do not use analytics or advertising.",
+  "consent.description":
+    "We use only essential local storage to make the website work. Maps and videos from external services (Google Maps, YouTube, Vimeo) may use cookies and load only with your consent. We do not use analytics or advertising.",
   "consent.policy": "Cookie Policy",
   "consent.privacy": "Privacy",
   "consent.acceptAll": "Accept all",
   "consent.necessaryOnly": "Essential only",
   "consent.settings": "Settings",
   "consent.dialogTitle": "Cookie settings",
-  "consent.dialogDescription": "You can change or withdraw your consent at any time using the “Cookie settings” link at the bottom of the website.",
+  "consent.dialogDescription":
+    "You can change or withdraw your consent at any time using the “Cookie settings” link at the bottom of the website.",
   "consent.necessary": "Essential",
   "consent.necessaryDescription": "Admin sign-in and remembering this choice. Always active.",
   "consent.necessaryAria": "Essential — always active",
   "consent.external": "External content",
-  "consent.externalDescription": "Maps (Google Maps) and videos (YouTube, Vimeo). These services may use their own cookies.",
+  "consent.externalDescription":
+    "Maps (Google Maps) and videos (YouTube, Vimeo). These services may use their own cookies.",
   "consent.rejectAll": "Reject all",
   "consent.save": "Save choices",
   "legal.skip": "Skip to content",
   "legal.updated": "Last updated: {date}",
-  "legal.questions": "For questions about this information, contact Ella Real Estate using the phone numbers listed on the homepage.",
+  "legal.questions":
+    "For questions about this information, contact Ella Real Estate using the phone numbers listed on the homepage.",
   "legal.navLabel": "Legal information",
   "legal.privacy": "Privacy",
   "legal.cookies": "Cookies",

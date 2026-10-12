@@ -32,6 +32,7 @@ type Detail = {
   district: string;
   address?: string;
   area: number;
+  yardArea: number | null;
   rooms?: number | null;
   layout?: string | null;
   floor?: string | null;
@@ -53,7 +54,7 @@ async function loadProperty(id: string): Promise<Detail> {
   const { data, error } = await supabase
     .from("properties")
     .select(
-      "id,title,type,status,price,city,district,address,area,rooms,floor,layout,description,main_image,video_url,map_lat,map_lng,seo_title,seo_description,is_published",
+      "id,title,type,status,price,city,district,address,area,yard_area,rooms,floor,layout,description,main_image,video_url,map_lat,map_lng,seo_title,seo_description,is_published",
     )
     .eq("id", id)
     .eq("is_published", true)
@@ -81,12 +82,13 @@ async function loadProperty(id: string): Promise<Detail> {
     district: data.district ?? "",
     address: data.address ?? undefined,
     area: Number(data.area ?? 0),
+    yardArea: data.yard_area == null ? null : Number(data.yard_area),
     rooms: data.rooms,
     layout: data.layout,
     floor: data.floor,
     description: data.description ?? "",
     media: urls.map((url) => ({ url, kind: isVideoUrl(url) ? "video" : "image" })),
-    videoEmbed: data.video_url ? embedUrl(data.video_url) ?? data.video_url : null,
+    videoEmbed: data.video_url ? (embedUrl(data.video_url) ?? data.video_url) : null,
     mapLat: data.map_lat != null ? Number(data.map_lat) : null,
     mapLng: data.map_lng != null ? Number(data.map_lng) : null,
     seoTitle: data.seo_title,
@@ -190,9 +192,7 @@ function PropertyNotFound() {
     <main className="mx-auto flex min-h-[60vh] max-w-xl flex-col items-center justify-center px-4 text-center">
       <LanguageSwitcher className="mb-6" />
       <h1 className="font-display text-3xl text-navy">{t("property.notFound")}</h1>
-      <p className="mt-3 text-muted-foreground">
-        {t("property.notFoundDescription")}
-      </p>
+      <p className="mt-3 text-muted-foreground">{t("property.notFoundDescription")}</p>
       <Button asChild className="mt-6 rounded-full bg-navy text-white hover:bg-navy-deep">
         <Link to="/" hash="catalog">
           {t("property.allProperties")}
@@ -204,8 +204,8 @@ function PropertyNotFound() {
 
 function PropertyDetail() {
   const p = Route.useLoaderData();
-  const settings = useSiteSettings();
   const { language, t } = useLanguage();
+  const settings = useSiteSettings(undefined, language);
   const translate = useTranslateContent();
   const [active, setActive] = useState(0);
 
@@ -250,7 +250,12 @@ function PropertyDetail() {
           <div className="mt-6 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
             <div className="aspect-[16/10] w-full bg-navy-deep/5">
               {current.kind === "video" ? (
-                <video src={current.url} controls playsInline className="h-full w-full object-contain" />
+                <video
+                  src={current.url}
+                  controls
+                  playsInline
+                  className="h-full w-full object-contain"
+                />
               ) : (
                 <img
                   src={current.url}
@@ -269,7 +274,9 @@ function PropertyDetail() {
                     onClick={() => setActive(i)}
                     aria-label={t("property.media").replace("{number}", String(i + 1))}
                     className={`h-16 w-24 shrink-0 overflow-hidden rounded-lg border-2 transition-colors ${
-                      i === active ? "border-gold" : "border-transparent opacity-80 hover:opacity-100"
+                      i === active
+                        ? "border-gold"
+                        : "border-transparent opacity-80 hover:opacity-100"
                     }`}
                   >
                     {m.kind === "video" ? (
@@ -286,11 +293,30 @@ function PropertyDetail() {
 
         <div className="mt-8 grid gap-8 lg:grid-cols-3">
           <div className="lg:col-span-2">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div
+              className={`grid grid-cols-2 gap-3 ${p.yardArea != null ? "sm:grid-cols-5" : "sm:grid-cols-4"}`}
+            >
               <Spec icon={Maximize2} label={t("property.area")} value={`${p.area} m²`} />
-              {p.floor && <Spec icon={Layers} label={p.type === "Къща" ? t("property.floors") : t("property.floor")} value={p.type === "Къща" ? t("property.storiesHouse").replace("{count}", p.floor) : p.floor} />}
-              {p.layout && <Spec icon={HomeIcon} label={t("property.layout")} value={translate(p.layout)} />}
-              {p.rooms ? <Spec icon={Building2} label={t("property.rooms")} value={String(p.rooms)} /> : null}
+              {p.yardArea != null && (
+                <Spec icon={Maximize2} label={t("property.yardArea")} value={`${p.yardArea} m²`} />
+              )}
+              {p.floor && (
+                <Spec
+                  icon={Layers}
+                  label={p.type === "Къща" ? t("property.floors") : t("property.floor")}
+                  value={
+                    p.type === "Къща"
+                      ? t("property.storiesHouse").replace("{count}", p.floor)
+                      : p.floor
+                  }
+                />
+              )}
+              {p.layout && (
+                <Spec icon={HomeIcon} label={t("property.layout")} value={translate(p.layout)} />
+              )}
+              {p.rooms ? (
+                <Spec icon={Building2} label={t("property.rooms")} value={String(p.rooms)} />
+              ) : null}
             </div>
 
             <h2 className="mt-8 font-display text-xl text-navy">{t("property.description")}</h2>
@@ -306,13 +332,13 @@ function PropertyDetail() {
                     <video src={p.videoEmbed} controls className="h-full w-full" />
                   ) : (
                     <ConsentEmbed service="YouTube / Vimeo" fallbackHref={p.videoEmbed}>
-                    <iframe
-                      src={p.videoEmbed}
-                      title={t("property.videoTitle")}
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; picture-in-picture"
-                      allowFullScreen
-                      className="h-full w-full"
-                    />
+                      <iframe
+                        src={p.videoEmbed}
+                        title={t("property.videoTitle")}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; picture-in-picture"
+                        allowFullScreen
+                        className="h-full w-full"
+                      />
                     </ConsentEmbed>
                   )}
                 </div>
@@ -323,13 +349,16 @@ function PropertyDetail() {
               <>
                 <h2 className="mt-8 font-display text-xl text-navy">{t("property.location")}</h2>
                 <div className="mt-3 aspect-[16/9] overflow-hidden rounded-2xl border border-border">
-                  <ConsentEmbed service="Google Maps" fallbackHref={`https://www.google.com/maps?q=${p.mapLat},${p.mapLng}`}>
-                  <iframe
-                    title={t("property.mapTitle")}
-                    loading="lazy"
-                    className="h-full w-full"
-                    src={`https://www.google.com/maps?q=${p.mapLat},${p.mapLng}&z=15&output=embed`}
-                  />
+                  <ConsentEmbed
+                    service="Google Maps"
+                    fallbackHref={`https://www.google.com/maps?q=${p.mapLat},${p.mapLng}`}
+                  >
+                    <iframe
+                      title={t("property.mapTitle")}
+                      loading="lazy"
+                      className="h-full w-full"
+                      src={`https://www.google.com/maps?q=${p.mapLat},${p.mapLng}&z=15&output=embed`}
+                    />
                   </ConsentEmbed>
                 </div>
               </>
@@ -337,14 +366,16 @@ function PropertyDetail() {
           </div>
 
           <aside className="h-fit rounded-2xl border border-border bg-card p-6 shadow-sm lg:sticky lg:top-6">
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">{t("property.price")}</div>
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+              {t("property.price")}
+            </div>
             <div className="font-display text-3xl font-medium text-navy">
               € {priceText}
-              {p.listing === "Наем" && <span className="text-base text-muted-foreground"> {t("property.month")}</span>}
+              {p.listing === "Наем" && (
+                <span className="text-base text-muted-foreground"> {t("property.month")}</span>
+              )}
             </div>
-            <p className="mt-3 text-sm text-muted-foreground">
-              {t("property.contactPrompt")}
-            </p>
+            <p className="mt-3 text-sm text-muted-foreground">{t("property.contactPrompt")}</p>
             <div className="mt-5 flex flex-col gap-3">
               <Button asChild className="rounded-full bg-navy text-white hover:bg-navy-deep">
                 <a href={tel}>

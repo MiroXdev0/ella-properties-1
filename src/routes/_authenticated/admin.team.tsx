@@ -5,6 +5,7 @@ import { Plus, Pencil, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
+import { adminMediaPreviewUrl } from "@/lib/admin/media";
 import { mediaUrl, fileExt, isImageFile, MAX_UPLOAD_BYTES } from "@/lib/media";
 import type { TeamRow } from "@/lib/admin/queries";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,7 +14,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 import { requireAdmin } from "@/lib/admin/guards";
 
@@ -22,34 +29,66 @@ export const Route = createFileRoute("/_authenticated/admin/team")({
   component: TeamAdmin,
 });
 
-const empty = { name: "", role: "", photo_url: "", phone: "", email: "", description: "", sort_order: 0, is_active: true };
+const empty = {
+  name: "",
+  role: "",
+  photo_url: "",
+  phone: "",
+  email: "",
+  description: "",
+  sort_order: 0,
+  is_active: true,
+};
 
 function TeamAdmin() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<TeamRow | null>(null);
   const [form, setForm] = useState(empty);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState("");
   const [uploading, setUploading] = useState(false);
 
-  const { data: items = [] } = useQuery({
+  const teamQuery = useQuery({
     queryKey: ["admin-team"],
     queryFn: async () => {
       const { data, error } = await supabase.from("team_members").select("*").order("sort_order");
       if (error) throw error;
-      return data as TeamRow[];
+      return Promise.all(
+        (data as TeamRow[]).map(async (member) => ({
+          ...member,
+          photoPreviewUrl: member.photo_url ? await adminMediaPreviewUrl(member.photo_url) : "",
+        })),
+      );
     },
   });
+  const items = teamQuery.data ?? [];
 
   function openNew() {
-    setEditing(null); setForm(empty); setOpen(true);
+    setEditing(null);
+    setForm(empty);
+    setPhotoPreviewUrl("");
+    setOpen(true);
   }
   function openEdit(t: TeamRow) {
     setEditing(t);
     setForm({
-      name: t.name, role: t.role ?? "", photo_url: t.photo_url ?? "",
-      phone: t.phone ?? "", email: t.email ?? "", description: t.description ?? "",
-      sort_order: t.sort_order, is_active: t.is_active,
+      name: t.name,
+      role: t.role ?? "",
+      photo_url: t.photo_url ?? "",
+      phone: t.phone ?? "",
+      email: t.email ?? "",
+      description: t.description ?? "",
+      sort_order: t.sort_order,
+      is_active: t.is_active,
     });
+    setPhotoPreviewUrl(t.photo_url ?? "");
+    if (t.photo_url) {
+      void adminMediaPreviewUrl(t.photo_url)
+        .then(setPhotoPreviewUrl)
+        .catch((error: unknown) =>
+          toast.error(error instanceof Error ? error.message : "Снимката не можа да се зареди."),
+        );
+    }
     setOpen(true);
   }
 
@@ -70,10 +109,14 @@ function TeamAdmin() {
         upsert: false,
       });
       if (error) throw error;
-      setForm((f) => ({ ...f, photo_url: mediaUrl(path) }));
+      const photoUrl = mediaUrl(path);
+      setForm((f) => ({ ...f, photo_url: photoUrl }));
+      setPhotoPreviewUrl(await adminMediaPreviewUrl(photoUrl));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Грешка");
-    } finally { setUploading(false); }
+    } finally {
+      setUploading(false);
+    }
   }
 
   async function save(e: React.FormEvent) {
@@ -93,7 +136,12 @@ function TeamAdmin() {
 
   async function del(id: string) {
     if (!confirm("Изтрий брокера?")) return;
-    await supabase.from("team_members").delete().eq("id", id);
+    const { error } = await supabase.from("team_members").delete().eq("id", id);
+    if (error) {
+      toast.error(`Брокерът не може да бъде изтрит: ${error.message}`);
+      return;
+    }
+    toast.success("Брокерът е изтрит");
     qc.invalidateQueries({ queryKey: ["admin-team"] });
   }
 
@@ -104,64 +152,161 @@ function TeamAdmin() {
           <h1 className="font-display text-3xl text-navy">Екип</h1>
           <p className="text-sm text-muted-foreground">Брокери и контактни лица</p>
         </div>
-        <Button onClick={openNew} className="bg-navy hover:bg-navy-deep"><Plus className="mr-2 h-4 w-4" /> Добави</Button>
+        <Button onClick={openNew} className="bg-navy hover:bg-navy-deep">
+          <Plus className="mr-2 h-4 w-4" /> Добави
+        </Button>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {items.map((t) => (
-          <Card key={t.id} className="border-0 shadow-sm">
-            <CardContent className="p-5">
-              <div className="flex items-start gap-4">
-                {t.photo_url ? (
-                  <img src={t.photo_url} alt={t.name} className="h-16 w-16 rounded-full object-cover" />
-                ) : (
-                  <div className="grid h-16 w-16 place-items-center rounded-full bg-navy text-xl text-gold">{t.name[0]}</div>
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="font-display text-lg text-navy">{t.name}</div>
-                  <div className="text-xs text-muted-foreground">{t.role}</div>
-                  <div className="mt-2 space-y-0.5 text-xs">
-                    {t.phone && <div>{t.phone}</div>}
-                    {t.email && <div className="truncate text-muted-foreground">{t.email}</div>}
+      {teamQuery.isLoading ? (
+        <Card className="border-0 shadow-sm">
+          <CardContent className="py-12 text-center text-muted-foreground">
+            Зареждане...
+          </CardContent>
+        </Card>
+      ) : teamQuery.isError ? (
+        <Card role="alert" className="border-0 shadow-sm">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 py-8 text-sm text-destructive">
+            <span>Екипът не можа да се зареди: {teamQuery.error.message}</span>
+            <Button variant="outline" onClick={() => void teamQuery.refetch()}>
+              Опитай отново
+            </Button>
+          </CardContent>
+        </Card>
+      ) : items.length === 0 ? (
+        <Card className="border-0 shadow-sm">
+          <CardContent className="py-12 text-center text-muted-foreground">
+            Няма добавени членове на екипа.
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {items.map((t) => (
+            <Card key={t.id} className="border-0 shadow-sm">
+              <CardContent className="p-5">
+                <div className="flex items-start gap-4">
+                  {t.photo_url ? (
+                    <img
+                      src={t.photoPreviewUrl}
+                      alt={t.name}
+                      className="h-16 w-16 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="grid h-16 w-16 place-items-center rounded-full bg-navy text-xl text-gold">
+                      {t.name[0]}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="font-display text-lg text-navy">{t.name}</div>
+                    <div className="text-xs text-muted-foreground">{t.role}</div>
+                    {!t.is_active && (
+                      <span className="mt-1 inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+                        Неактивен
+                      </span>
+                    )}
+                    <div className="mt-2 space-y-0.5 text-xs">
+                      {t.phone && <div>{t.phone}</div>}
+                      {t.email && <div className="truncate text-muted-foreground">{t.email}</div>}
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="mt-4 flex justify-end gap-1">
-                <Button size="icon" variant="ghost" onClick={() => openEdit(t)}><Pencil className="h-4 w-4" /></Button>
-                <Button size="icon" variant="ghost" onClick={() => del(t.id)}><Trash2 className="h-4 w-4 text-rose-600" /></Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+                <div className="mt-4 flex justify-end gap-1">
+                  <Button size="icon" variant="ghost" onClick={() => openEdit(t)}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button size="icon" variant="ghost" onClick={() => del(t.id)}>
+                    <Trash2 className="h-4 w-4 text-rose-600" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle className="font-display text-2xl text-navy">{editing ? "Редактирай" : "Нов брокер"}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle className="font-display text-2xl text-navy">
+              {editing ? "Редактирай" : "Нов брокер"}
+            </DialogTitle>
+          </DialogHeader>
           <form onSubmit={save} className="space-y-4">
             <div>
               <Label>Снимка</Label>
               <div className="mt-1.5 flex items-center gap-3">
-                {form.photo_url && <img src={form.photo_url} alt="" className="h-16 w-16 rounded-full object-cover" />}
+                {photoPreviewUrl && (
+                  <img
+                    src={photoPreviewUrl}
+                    alt=""
+                    className="h-16 w-16 rounded-full object-cover"
+                  />
+                )}
                 <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm hover:bg-muted">
                   <Upload className="h-4 w-4" /> {uploading ? "Качване..." : "Качи снимка"}
-                  <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadPhoto(e.target.files[0])} />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => e.target.files?.[0] && uploadPhoto(e.target.files[0])}
+                  />
                 </label>
               </div>
             </div>
-            <div><Label>Име *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></div>
-            <div><Label>Длъжност</Label><Input value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} placeholder="напр. Брокер" /></div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><Label>Телефон</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
-              <div><Label>Имейл</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
+            <div>
+              <Label>Име *</Label>
+              <Input
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                required
+              />
             </div>
-            <div><Label>Описание</Label><Textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
+            <div>
+              <Label>Длъжност</Label>
+              <Input
+                value={form.role}
+                onChange={(e) => setForm({ ...form, role: e.target.value })}
+                placeholder="напр. Брокер"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Телефон</Label>
+                <Input
+                  value={form.phone}
+                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Имейл</Label>
+                <Input
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                />
+              </div>
+            </div>
+            <div>
+              <Label>Описание</Label>
+              <Textarea
+                rows={3}
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+              />
+            </div>
             <label className="flex items-center gap-2 text-sm">
-              <Switch checked={form.is_active} onCheckedChange={(v) => setForm({ ...form, is_active: v })} /> Активен
+              <Switch
+                checked={form.is_active}
+                onCheckedChange={(v) => setForm({ ...form, is_active: v })}
+              />{" "}
+              Активен
             </label>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>Откажи</Button>
-              <Button type="submit" className="bg-navy hover:bg-navy-deep">Запази</Button>
+              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                Откажи
+              </Button>
+              <Button type="submit" className="bg-navy hover:bg-navy-deep">
+                Запази
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -169,8 +314,3 @@ function TeamAdmin() {
     </div>
   );
 }
-
-
-
-
-

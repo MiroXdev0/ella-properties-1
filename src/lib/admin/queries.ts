@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 
 export type PropertyRow = {
   id: string;
@@ -11,6 +12,7 @@ export type PropertyRow = {
   district: string | null;
   address: string | null;
   area: number | null;
+  yard_area: number | null;
   rooms: number | null;
   layout: string | null;
   floor: string | null;
@@ -53,6 +55,11 @@ export type TeamRow = {
 
 export type SettingsRow = {
   id: number;
+  content_en: Json;
+  og_image_url: string | null;
+  services_image_url: string;
+  services_image_heading: string;
+  working_hours: Json;
   logo_url: string | null;
   phone1: string | null;
   phone2: string | null;
@@ -88,17 +95,17 @@ export type SettingsRow = {
   about_eyebrow: string | null;
   about_stat4_value: string | null;
   about_stat4_label: string | null;
-  nav_links: unknown;
+  nav_links: Json | null;
   services_eyebrow: string | null;
   services_title: string | null;
   services_subtitle: string | null;
-  services: unknown;
+  services: Json | null;
   why_eyebrow: string | null;
   why_title: string | null;
-  why_reasons: unknown;
+  why_reasons: Json | null;
   testimonials_eyebrow: string | null;
   testimonials_title: string | null;
-  testimonials: unknown;
+  testimonials: Json | null;
   catalog_eyebrow: string | null;
   catalog_title: string | null;
   contact_eyebrow: string | null;
@@ -114,22 +121,38 @@ export type SettingsRow = {
 };
 
 export async function fetchStats() {
-  const [total, active, sold, rent, inquiries] = await Promise.all([
+  const [total, active, drafts, sold, rent, inquiries] = await Promise.all([
     supabase.from("properties").select("id", { count: "exact", head: true }),
-    supabase.from("properties").select("id", { count: "exact", head: true }).eq("is_published", true),
-    supabase.from("properties").select("id", { count: "exact", head: true }).in("status", ["Продаден"]),
-    supabase.from("properties").select("id", { count: "exact", head: true }).eq("status", "Под наем"),
+    supabase
+      .from("properties")
+      .select("id", { count: "exact", head: true })
+      .eq("is_published", true),
+    supabase
+      .from("properties")
+      .select("id", { count: "exact", head: true })
+      .eq("is_published", false),
+    supabase
+      .from("properties")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["Продаден"]),
+    supabase
+      .from("properties")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "Под наем"),
     supabase.from("inquiries").select("id", { count: "exact", head: true }).eq("status", "Ново"),
   ]);
+
+  const failedQuery = [total, active, drafts, sold, rent, inquiries].find((result) => result.error);
+  if (failedQuery?.error) {
+    throw new Error(`Неуспешно зареждане на статистиката: ${failedQuery.error.message}`);
+  }
+
   return {
     total: total.count ?? 0,
     active: active.count ?? 0,
+    drafts: drafts.count ?? 0,
     sold: sold.count ?? 0,
     rent: rent.count ?? 0,
     newInquiries: inquiries.count ?? 0,
   };
 }
-
-
-
-

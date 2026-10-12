@@ -18,6 +18,7 @@ export interface Property {
   district: string;
   price: number;
   area: number;
+  yardArea?: number | null;
   layout?: ApartmentLayout;
   floor?: string;
   image: string | null;

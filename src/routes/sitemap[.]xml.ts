@@ -46,6 +46,36 @@ async function publishedPropertyEntries(): Promise<SitemapEntry[]> {
   return entries;
 }
 
+async function publishedPageEntries(): Promise<SitemapEntry[]> {
+  const entries: SitemapEntry[] = [];
+  let offset = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("site_pages")
+      .select("slug,updated_at")
+      .eq("is_published", true)
+      .order("updated_at", { ascending: false })
+      .range(offset, offset + PAGE_SIZE - 1);
+
+    if (error) throw error;
+
+    for (const page of data ?? []) {
+      if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(page.slug)) continue;
+      const date = page.updated_at ? new Date(page.updated_at) : null;
+      entries.push({
+        path: `/pages/${encodeURIComponent(page.slug)}`,
+        ...(date && !Number.isNaN(date.valueOf()) ? { lastmod: date.toISOString().slice(0, 10) } : {}),
+      });
+    }
+
+    if (!data || data.length < PAGE_SIZE) break;
+    offset += data.length;
+  }
+
+  return entries;
+}
+
 function escapeXml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -63,6 +93,7 @@ export const Route = createFileRoute("/sitemap.xml")({
           const entries: SitemapEntry[] = [
             { path: "/" },
             ...(await publishedPropertyEntries()),
+            ...(await publishedPageEntries()),
           ];
           const uniqueEntries = [...new Map(entries.map((entry) => [entry.path, entry])).values()];
           const urls = uniqueEntries.map((entry) =>
