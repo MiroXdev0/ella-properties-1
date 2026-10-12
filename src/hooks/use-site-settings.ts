@@ -8,6 +8,52 @@ import type { Language } from "@/i18n/LanguageProvider";
 export type NavLink = { href: string; label: string };
 export type ServiceItem = { icon: string; title: string; items: string[] };
 export type TestimonialItem = { name: string; role: string; text: string };
+export type HomeSectionVisibility = Record<
+  "about" | "services" | "catalog" | "why" | "testimonials" | "contact",
+  boolean
+>;
+
+export const DEFAULT_HOME_SECTION_VISIBILITY: HomeSectionVisibility = {
+  about: true,
+  services: true,
+  catalog: true,
+  why: true,
+  testimonials: true,
+  contact: true,
+};
+
+export function getHomeSectionVisibility(content: Record<string, unknown> | null | undefined) {
+  const stored = content?.site_section_visibility;
+  if (!stored || typeof stored !== "object" || Array.isArray(stored)) {
+    return DEFAULT_HOME_SECTION_VISIBILITY;
+  }
+
+  const sections = stored as Record<string, unknown>;
+  return {
+    about: typeof sections.about === "boolean" ? sections.about : true,
+    services: typeof sections.services === "boolean" ? sections.services : true,
+    catalog: typeof sections.catalog === "boolean" ? sections.catalog : true,
+    why: typeof sections.why === "boolean" ? sections.why : true,
+    testimonials: typeof sections.testimonials === "boolean" ? sections.testimonials : true,
+    contact: typeof sections.contact === "boolean" ? sections.contact : true,
+  };
+}
+
+const SECTION_BY_ANCHOR: Record<string, keyof HomeSectionVisibility> = {
+  "#about": "about",
+  "#services": "services",
+  "#catalog": "catalog",
+  "#why": "why",
+  "#testimonials": "testimonials",
+  "#contact": "contact",
+};
+
+export function isHomeSectionLinkVisible(href: string, visibility: HomeSectionVisibility) {
+  const hashIndex = href.indexOf("#");
+  if (hashIndex < 0) return true;
+  const section = SECTION_BY_ANCHOR[`#${href.slice(hashIndex + 1).split(/[?&]/, 1)[0]}`];
+  return !section || visibility[section];
+}
 
 const LEGACY_METRICS = [
   ["15+", "години опит"],

@@ -43,7 +43,8 @@ import {
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 
-import heroImage from "@/assets/hero.jpg";
+import heroImage from "@/assets/hero-1920.webp";
+import heroImageMobile from "@/assets/hero-960.webp";
 import { type Property, type PropertyType, APARTMENT_LAYOUTS } from "@/data/properties";
 import { fetchPublicProperties, usePublicProperties } from "@/hooks/use-public-properties";
 import { useServerFn } from "@tanstack/react-start";
@@ -60,7 +61,10 @@ import {
   fetchPublicSettings,
   useSiteSettings,
   DEFAULT_SETTINGS,
+  getHomeSectionVisibility,
+  isHomeSectionLinkVisible,
   type PublicSettings,
+  type HomeSectionVisibility,
 } from "@/hooks/use-site-settings";
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -194,6 +198,7 @@ function HomePage() {
   const { properties, settings: initialSettings } = Route.useLoaderData();
   const { language, t } = useLanguage();
   const settings = useSiteSettings(initialSettings, language);
+  const sectionVisibility = getHomeSectionVisibility(settings.content_en);
   return (
     <div
       lang={language}
@@ -206,17 +211,19 @@ function HomePage() {
       >
         {t("nav.skip")}
       </a>
-      <Header settings={settings} />
+      <Header settings={settings} sectionVisibility={sectionVisibility} />
       <main id="main">
-        <Hero settings={settings} />
-        <About settings={settings} />
-        <Services settings={settings} />
-        <Catalog settings={settings} initialProperties={properties} />
-        <WhyUs settings={settings} />
-        <Testimonials settings={settings} />
-        <Contact settings={settings} />
+        <Hero settings={settings} sectionVisibility={sectionVisibility} />
+        {sectionVisibility.about && <About settings={settings} />}
+        {sectionVisibility.services && <Services settings={settings} />}
+        {sectionVisibility.catalog && (
+          <Catalog settings={settings} initialProperties={properties} />
+        )}
+        {sectionVisibility.why && <WhyUs settings={settings} />}
+        {sectionVisibility.testimonials && <Testimonials settings={settings} />}
+        {sectionVisibility.contact && <Contact settings={settings} />}
       </main>
-      <Footer settings={settings} />
+      <Footer settings={settings} sectionVisibility={sectionVisibility} />
       <FloatingContacts settings={settings} />
       <Toaster position="top-center" />
     </div>
@@ -236,11 +243,19 @@ function BrandStyle({ primary, accent }: { primary: string; accent: string }) {
 
 /* ---------------- Header ---------------- */
 
-function Header({ settings }: { settings: PublicSettings }) {
+function Header({
+  settings,
+  sectionVisibility,
+}: {
+  settings: PublicSettings;
+  sectionVisibility: HomeSectionVisibility;
+}) {
   const [open, setOpen] = useState(false);
   const { t } = useLanguage();
   const translate = useTranslateContent();
-  const nav = settings.nav_links ?? [];
+  const nav = (settings.nav_links ?? []).filter((link) =>
+    isHomeSectionLinkVisible(link.href, sectionVisibility),
+  );
   const navTranslation: Record<string, keyof typeof bg> = {
     "#about": "nav.about",
     "#services": "nav.services",
@@ -358,7 +373,13 @@ function Logo({ settings }: { settings: PublicSettings }) {
 
 /* ---------------- Hero ---------------- */
 
-function Hero({ settings }: { settings: PublicSettings }) {
+function Hero({
+  settings,
+  sectionVisibility,
+}: {
+  settings: PublicSettings;
+  sectionVisibility: HomeSectionVisibility;
+}) {
   const translate = useTranslateContent();
   const { language } = useLanguage();
   const stats = [
@@ -366,11 +387,23 @@ function Hero({ settings }: { settings: PublicSettings }) {
     { k: settings.stat2_value, v: settings.stat2_label },
     { k: settings.stat3_value, v: settings.stat3_label },
   ].filter((stat) => stat.k && stat.v);
+  const showPrimaryCta = isHomeSectionLinkVisible(
+    settings.hero_cta_link || "#catalog",
+    sectionVisibility,
+  );
+  const showSecondaryCta = isHomeSectionLinkVisible(
+    settings.hero_secondary_cta_link || "#contact",
+    sectionVisibility,
+  );
   return (
     <section id="top" className="relative isolate overflow-hidden">
       <div className="relative">
         <img
           src={settings.hero_image_url || heroImage}
+          srcSet={
+            settings.hero_image_url ? undefined : `${heroImageMobile} 960w, ${heroImage} 1920w`
+          }
+          sizes="100vw"
           alt={
             settings.hero_image_url
               ? translate("Изображение на недвижим имот")
@@ -396,27 +429,33 @@ function Hero({ settings }: { settings: PublicSettings }) {
               <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-white/80 sm:mt-6 sm:text-lg">
                 {displayCoverageText(settings.hero_subtitle, translate, language)}
               </p>
-              <div className="mt-7 flex flex-col gap-3 sm:mt-9 sm:flex-row sm:flex-wrap">
-                <Button
-                  asChild
-                  size="lg"
-                  className="h-12 w-full rounded-full bg-gold px-7 text-navy-deep hover:bg-gold-soft sm:w-auto"
-                >
-                  <a href={settings.hero_cta_link || "#catalog"}>
-                    {translate(settings.hero_cta_label)} <ArrowRight className="ml-2 h-4 w-4" />
-                  </a>
-                </Button>
-                <Button
-                  asChild
-                  size="lg"
-                  variant="outline"
-                  className="h-12 w-full rounded-full border-white/40 bg-white/5 px-7 text-white backdrop-blur hover:bg-white/10 hover:text-white sm:w-auto"
-                >
-                  <a href={settings.hero_secondary_cta_link || "#contact"}>
-                    {translate(settings.hero_secondary_cta_label)}
-                  </a>
-                </Button>
-              </div>
+              {(showPrimaryCta || showSecondaryCta) && (
+                <div className="mt-7 flex flex-col gap-3 sm:mt-9 sm:flex-row sm:flex-wrap">
+                  {showPrimaryCta && (
+                    <Button
+                      asChild
+                      size="lg"
+                      className="h-12 w-full rounded-full bg-gold px-7 text-navy-deep hover:bg-gold-soft sm:w-auto"
+                    >
+                      <a href={settings.hero_cta_link || "#catalog"}>
+                        {translate(settings.hero_cta_label)} <ArrowRight className="ml-2 h-4 w-4" />
+                      </a>
+                    </Button>
+                  )}
+                  {showSecondaryCta && (
+                    <Button
+                      asChild
+                      size="lg"
+                      variant="outline"
+                      className="h-12 w-full rounded-full border-white/40 bg-white/5 px-7 text-white backdrop-blur hover:bg-white/10 hover:text-white sm:w-auto"
+                    >
+                      <a href={settings.hero_secondary_cta_link || "#contact"}>
+                        {translate(settings.hero_secondary_cta_label)}
+                      </a>
+                    </Button>
+                  )}
+                </div>
+              )}
               {stats.length > 0 && (
                 <dl className="mt-8 grid max-w-lg grid-cols-3 gap-4 border-t border-white/15 pt-6 text-white sm:mt-12 sm:gap-6 sm:pt-8">
                   {stats.map((s) => (
@@ -1267,10 +1306,18 @@ function ContactRow({
 
 /* ---------------- Footer ---------------- */
 
-function Footer({ settings }: { settings: PublicSettings }) {
+function Footer({
+  settings,
+  sectionVisibility,
+}: {
+  settings: PublicSettings;
+  sectionVisibility: HomeSectionVisibility;
+}) {
   const { language, t } = useLanguage();
   const translate = useTranslateContent();
-  const nav = settings.nav_links ?? [];
+  const nav = (settings.nav_links ?? []).filter((link) =>
+    isHomeSectionLinkVisible(link.href, sectionVisibility),
+  );
   const logoUrl = publicLogoUrl(settings.logo_url) ?? "/ella-imoti-logo.png";
   const brandName = displayBrandName(settings.brand_name);
   const copyright = (settings.footer_copyright || "").replace(

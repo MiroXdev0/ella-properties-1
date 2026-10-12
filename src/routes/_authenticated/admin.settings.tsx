@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { requireAdmin } from "@/lib/admin/guards";
 import {
   Select,
@@ -22,6 +23,11 @@ import {
 import { ImagePlus, Plus, Trash2 } from "lucide-react";
 import { fileExt, isImageFile, MAX_UPLOAD_BYTES, mediaUrl } from "@/lib/media";
 import { adminMediaPreviewUrl } from "@/lib/admin/media";
+import {
+  DEFAULT_HOME_SECTION_VISIBILITY,
+  getHomeSectionVisibility,
+  type HomeSectionVisibility,
+} from "@/hooks/use-site-settings";
 
 const ICON_CHOICES = [
   "Home",
@@ -119,6 +125,15 @@ export const Route = createFileRoute("/_authenticated/admin/settings")({
   beforeLoad: ({ context }) => requireAdmin(context),
   component: SettingsAdmin,
 });
+
+const HOME_SECTIONS: { key: keyof HomeSectionVisibility; label: string; description: string }[] = [
+  { key: "about", label: "За нас", description: "Информация и представяне на агенцията" },
+  { key: "services", label: "Услуги", description: "Услуги и секция Кредит Навигатор" },
+  { key: "catalog", label: "Каталог с имоти", description: "Филтри, оферти и линкове по град" },
+  { key: "why", label: "Защо нас", description: "Предимства на агенцията" },
+  { key: "testimonials", label: "Отзиви", description: "Клиентски отзиви" },
+  { key: "contact", label: "Контакти", description: "Форма и карта за връзка" },
+];
 
 function SettingsAdmin() {
   const [form, setForm] = useState<Partial<SettingsRow>>({});
@@ -218,6 +233,7 @@ function SettingsAdmin() {
   const englishTestimonials = Array.isArray(contentEn.testimonials)
     ? (contentEn.testimonials as TestimonialItem[])
     : testimonials;
+  const sectionVisibility = getHomeSectionVisibility(contentEn);
 
   return (
     <div className="space-y-6">
@@ -244,6 +260,56 @@ function SettingsAdmin() {
         </div>
       ) : data ? (
         <form onSubmit={save} className="space-y-6">
+          <Section title="Показване на секции">
+            <p className="text-sm text-muted-foreground">
+              Изключените секции се скриват от началната страница и от менюто. Промените се
+              публикуват след запазване на настройките.
+            </p>
+            <div className="divide-y divide-border">
+              {HOME_SECTIONS.map(({ key, label, description }) => (
+                <div key={key} className="flex min-h-16 items-center justify-between gap-4 py-3">
+                  <div>
+                    <Label
+                      htmlFor={`section-${key}`}
+                      className="cursor-pointer text-sm font-medium"
+                    >
+                      {label}
+                    </Label>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
+                  </div>
+                  <Switch
+                    id={`section-${key}`}
+                    checked={sectionVisibility[key]}
+                    onCheckedChange={(checked) =>
+                      setContentEn((current) => ({
+                        ...current,
+                        site_section_visibility: {
+                          ...getHomeSectionVisibility(current),
+                          [key]: checked,
+                        },
+                      }))
+                    }
+                    aria-label={`Показвай секция: ${label}`}
+                  />
+                </div>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-4"
+                disabled={HOME_SECTIONS.every(({ key }) => sectionVisibility[key])}
+                onClick={() =>
+                  setContentEn((current) => ({
+                    ...current,
+                    site_section_visibility: DEFAULT_HOME_SECTION_VISIBILITY,
+                  }))
+                }
+              >
+                Покажи всички секции
+              </Button>
+            </div>
+          </Section>
+
           <Section title="Бранд и цветове">
             <div className="grid gap-4 sm:grid-cols-2">
               <Row label="Име на бранда">
