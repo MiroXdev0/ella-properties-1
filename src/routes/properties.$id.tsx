@@ -1,9 +1,14 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
   MapPin,
   Maximize2,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
   Layers,
   Phone,
   MessageCircle,
@@ -12,6 +17,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useSiteSettings } from "@/hooks/use-site-settings";
 import { isVideoUrl, embedUrl } from "@/lib/media";
@@ -208,9 +214,24 @@ function PropertyDetail() {
   const settings = useSiteSettings(undefined, language);
   const translate = useTranslateContent();
   const [active, setActive] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const pointerStart = useRef<{ x: number; y: number } | null>(null);
+  const suppressPhotoClickUntil = useRef(0);
 
   const priceText = new Intl.NumberFormat(language === "en" ? "en-GB" : "bg-BG").format(p.price);
   const current = p.media[active];
+  const hasMultipleMedia = p.media.length > 1;
+  const showPrevious = () => setActive((index) => (index - 1 + p.media.length) % p.media.length);
+  const showNext = () => setActive((index) => (index + 1) % p.media.length);
+  const changeMedia = (direction: -1 | 1) => {
+    setActive((index) => (index + direction + p.media.length) % p.media.length);
+    setZoom(1);
+  };
+  const closeLightbox = (open: boolean) => {
+    setLightboxOpen(open);
+    if (!open) setZoom(1);
+  };
   const phone = settings.phone1;
   const tel = `tel:${(phone ?? "").replace(/\s+/g, "")}`;
   const wa = `https://wa.me/${(phone ?? "").replace(/[^0-9]/g, "")}`;
@@ -248,7 +269,51 @@ function PropertyDetail() {
         {/* Gallery */}
         {current && (
           <div className="mt-6 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-            <div className="aspect-[16/10] w-full bg-navy-deep/5">
+            <div
+              role="group"
+              aria-label={
+                language === "en" ? "Property photo gallery" : "Галерия със снимки на имота"
+              }
+              tabIndex={hasMultipleMedia ? 0 : undefined}
+              onKeyDown={(event) => {
+                if (!hasMultipleMedia || current.kind !== "image") return;
+                if (event.key === "ArrowLeft") {
+                  event.preventDefault();
+                  showPrevious();
+                } else if (event.key === "ArrowRight") {
+                  event.preventDefault();
+                  showNext();
+                }
+              }}
+              onPointerDown={(event) => {
+                if (!hasMultipleMedia || current.kind !== "image" || event.button !== 0) return;
+                if (
+                  event.target instanceof Element &&
+                  event.target.closest(".gallery-desktop-control")
+                )
+                  return;
+                pointerStart.current = { x: event.clientX, y: event.clientY };
+              }}
+              onPointerUp={(event) => {
+                const start = pointerStart.current;
+                pointerStart.current = null;
+                if (!start || !hasMultipleMedia || current.kind !== "image") return;
+                const deltaX = event.clientX - start.x;
+                const deltaY = event.clientY - start.y;
+                if (Math.abs(deltaX) < 40 || Math.abs(deltaX) < Math.abs(deltaY) * 1.2) return;
+                suppressPhotoClickUntil.current = Date.now() + 150;
+                if (deltaX > 0) showPrevious();
+                else showNext();
+              }}
+              onPointerCancel={() => {
+                pointerStart.current = null;
+              }}
+              className={`relative aspect-[16/10] w-full bg-navy-deep/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold ${
+                hasMultipleMedia && current.kind === "image"
+                  ? "touch-pan-y cursor-grab active:cursor-grabbing"
+                  : ""
+              }`}
+            >
               {current.kind === "video" ? (
                 <video
                   src={current.url}
@@ -257,12 +322,55 @@ function PropertyDetail() {
                   className="h-full w-full object-contain"
                 />
               ) : (
-                <img
-                  src={current.url}
-                  alt={p.title}
-                  decoding="async"
-                  className="h-full w-full object-cover"
-                />
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    if (event.detail > 0 && Date.now() < suppressPhotoClickUntil.current) return;
+                    setLightboxOpen(true);
+                  }}
+                  aria-label={
+                    language === "en" ? "Open photo in full screen" : "Отвори снимката на цял екран"
+                  }
+                  className="group absolute inset-0 h-full w-full cursor-zoom-in focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold"
+                >
+                  <img
+                    src={current.url}
+                    alt={p.title}
+                    draggable={false}
+                    decoding="async"
+                    className="h-full w-full select-none object-cover"
+                  />
+                  <span className="absolute right-3 top-3 grid h-11 w-11 place-items-center rounded-full bg-navy/80 text-white opacity-0 shadow-md transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                    <ZoomIn className="h-5 w-5" aria-hidden="true" />
+                  </span>
+                </button>
+              )}
+              {hasMultipleMedia && (
+                <>
+                  <button
+                    type="button"
+                    onClick={showPrevious}
+                    aria-label={language === "en" ? "Previous image" : "Предишна снимка"}
+                    className="gallery-desktop-control absolute left-3 top-1/2 z-10 hidden h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-navy/80 text-white shadow-md transition-[background-color,opacity] hover:bg-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
+                  >
+                    <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={showNext}
+                    aria-label={language === "en" ? "Next image" : "Следваща снимка"}
+                    className="gallery-desktop-control absolute right-3 top-1/2 z-10 hidden h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-navy/80 text-white shadow-md transition-[background-color,opacity] hover:bg-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
+                  >
+                    <ChevronRight className="h-5 w-5" aria-hidden="true" />
+                  </button>
+                  <span
+                    aria-live="polite"
+                    aria-atomic="true"
+                    className="absolute bottom-3 right-3 rounded-full bg-navy/80 px-3 py-1 text-xs font-medium tabular-nums text-white"
+                  >
+                    {active + 1} / {p.media.length}
+                  </span>
+                </>
               )}
             </div>
             {p.media.length > 1 && (
@@ -288,6 +396,111 @@ function PropertyDetail() {
                 ))}
               </div>
             )}
+            <Dialog open={lightboxOpen} onOpenChange={closeLightbox}>
+              <DialogContent
+                aria-label={
+                  language === "en" ? "Property photo viewer" : "Преглед на снимка на имота"
+                }
+                onKeyDown={(event) => {
+                  if (event.key === "ArrowLeft" && hasMultipleMedia) {
+                    event.preventDefault();
+                    changeMedia(-1);
+                  } else if (event.key === "ArrowRight" && hasMultipleMedia) {
+                    event.preventDefault();
+                    changeMedia(1);
+                  }
+                }}
+                className="h-[100dvh] w-screen max-w-none overflow-hidden rounded-none border-0 bg-navy-deep/95 p-0 text-white shadow-none [&>button:last-child]:right-3 [&>button:last-child]:top-3 [&>button:last-child]:z-20 [&>button:last-child]:grid [&>button:last-child]:h-11 [&>button:last-child]:w-11 [&>button:last-child]:place-items-center [&>button:last-child]:rounded-full [&>button:last-child]:bg-white/10 [&>button:last-child]:text-white [&>button:last-child]:opacity-100 [&>button:last-child]:hover:bg-white/20 [&>button:last-child]:focus-visible:ring-2 [&>button:last-child]:focus-visible:ring-gold [&>button:last-child]:focus-visible:ring-offset-0"
+              >
+                <DialogTitle className="sr-only">
+                  {language === "en" ? "Property photo viewer" : "Преглед на снимка на имота"}
+                </DialogTitle>
+                <div
+                  className="absolute inset-0 overflow-auto px-3 pb-24 pt-16 sm:px-12"
+                  onWheel={(event) => {
+                    setZoom((value) =>
+                      Math.min(3, Math.max(1, value + (event.deltaY < 0 ? 0.25 : -0.25))),
+                    );
+                  }}
+                >
+                  <div className="grid min-h-full min-w-full place-items-center">
+                    {current?.kind === "image" ? (
+                      <img
+                        src={current.url}
+                        alt={p.title}
+                        draggable={false}
+                        className="max-h-[calc(100dvh-10rem)] max-w-[calc(100vw-2rem)] select-none object-contain transition-transform duration-150 ease-out sm:max-w-[calc(100vw-6rem)]"
+                        style={{ transform: `scale(${zoom})` }}
+                      />
+                    ) : current?.kind === "video" ? (
+                      <video
+                        src={current.url}
+                        controls
+                        playsInline
+                        className="max-h-[calc(100dvh-10rem)] max-w-[calc(100vw-2rem)] sm:max-w-[calc(100vw-6rem)]"
+                      />
+                    ) : null}
+                  </div>
+                </div>
+                {hasMultipleMedia && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => changeMedia(-1)}
+                      aria-label={language === "en" ? "Previous image" : "Предишна снимка"}
+                      className="absolute left-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold sm:left-6"
+                    >
+                      <ChevronLeft className="h-6 w-6" aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => changeMedia(1)}
+                      aria-label={language === "en" ? "Next image" : "Следваща снимка"}
+                      className="absolute right-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold sm:right-6"
+                    >
+                      <ChevronRight className="h-6 w-6" aria-hidden="true" />
+                    </button>
+                  </>
+                )}
+                <div className="absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/50 p-2 shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => setZoom((value) => Math.max(1, value - 0.5))}
+                    disabled={zoom <= 1 || current?.kind !== "image"}
+                    aria-label={language === "en" ? "Zoom out" : "Намали"}
+                    className="grid h-11 w-11 place-items-center rounded-full text-white transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-40"
+                  >
+                    <ZoomOut className="h-5 w-5" aria-hidden="true" />
+                  </button>
+                  <span className="min-w-14 text-center text-sm tabular-nums" aria-live="polite">
+                    {current?.kind === "image" ? `${Math.round(zoom * 100)}%` : ""}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setZoom((value) => Math.min(3, value + 0.5))}
+                    disabled={zoom >= 3 || current?.kind !== "image"}
+                    aria-label={language === "en" ? "Zoom in" : "Увеличи"}
+                    className="grid h-11 w-11 place-items-center rounded-full text-white transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-40"
+                  >
+                    <ZoomIn className="h-5 w-5" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setZoom(1)}
+                    disabled={zoom === 1 || current?.kind !== "image"}
+                    aria-label={language === "en" ? "Reset zoom" : "Върни оригиналния размер"}
+                    className="grid h-11 w-11 place-items-center rounded-full text-white transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-40"
+                  >
+                    <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                  {hasMultipleMedia && (
+                    <span className="ml-1 border-l border-white/20 pl-3 text-sm tabular-nums">
+                      {active + 1} / {p.media.length}
+                    </span>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         )}
 

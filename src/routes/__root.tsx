@@ -85,8 +85,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:title", content: "Елла Недвижими Имоти — актуални обяви за имоти" },
       {
         property: "og:description",
-        content:
-          "Актуални обяви и съдействие при покупка, продажба и отдаване под наем на имоти.",
+        content: "Актуални обяви и съдействие при покупка, продажба и отдаване под наем на имоти.",
       },
       { property: "og:type", content: "website" },
       { property: "og:site_name", content: "Елла Недвижими Имоти" },
@@ -104,13 +103,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       {
         rel: "icon",
-        href: "/app-icon-192.png?v=20261011",
+        href: "/app-icon-192-v2.png",
         type: "image/png",
         sizes: "192x192",
       },
-      { rel: "shortcut icon", href: "/app-icon-192.png?v=20261011", type: "image/png" },
-      { rel: "manifest", href: "/manifest.webmanifest" },
-      { rel: "apple-touch-icon", href: "/app-icon-192.png?v=20261011" },
+      { rel: "shortcut icon", href: "/app-icon-192-v2.png", type: "image/png" },
+      { rel: "manifest", href: "/manifest.webmanifest?v=20261012-logo" },
+      { rel: "apple-touch-icon", href: "/app-icon-192-v2.png" },
     ],
   }),
   shellComponent: RootShell,
