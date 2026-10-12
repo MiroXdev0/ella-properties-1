@@ -17,7 +17,11 @@ export function readConsent(): Consent | null {
     const raw = window.localStorage.getItem(CONSENT_KEY);
     if (!raw) return null;
     const v = JSON.parse(raw);
-    return typeof v?.media === "boolean" ? (v as Consent) : null;
+    return typeof v?.media === "boolean" &&
+      typeof v?.decidedAt === "string" &&
+      !Number.isNaN(Date.parse(v.decidedAt))
+      ? { media: v.media, decidedAt: v.decidedAt }
+      : null;
   } catch {
     return null;
   }
@@ -50,9 +54,3 @@ export function useConsent() {
   }, []);
   return { consent, ready };
 }
-
-
-
-
-
-

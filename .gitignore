@@ -29,6 +29,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+.agents/
+skills-lock.json*
 
 # Environment / secrets
 .env

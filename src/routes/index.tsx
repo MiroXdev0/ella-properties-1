@@ -61,6 +61,7 @@ import {
   fetchPublicSettings,
   useSiteSettings,
   DEFAULT_SETTINGS,
+  getContactPhoneName,
   getHomeSectionVisibility,
   isHomeSectionLinkVisible,
   type PublicSettings,
@@ -589,7 +590,7 @@ function Services({ settings }: { settings: PublicSettings }) {
                 height={650}
                 loading="lazy"
                 decoding="async"
-                className="mx-auto h-auto max-h-[34rem] w-full object-contain transition-opacity duration-200 group-hover:opacity-90"
+                className="mx-auto h-auto max-h-72 w-full max-w-4xl object-contain transition-opacity duration-200 group-hover:opacity-90"
               />
             </a>
           </div>
@@ -1093,10 +1094,22 @@ function Contact({ settings }: { settings: PublicSettings }) {
               title={t("contact.phones")}
               lines={[
                 ...(settings.phone1
-                  ? [{ text: settings.phone1, href: telHref(settings.phone1) }]
+                  ? [
+                      {
+                        text: settings.phone1,
+                        href: telHref(settings.phone1),
+                        label: getContactPhoneName(settings.content_en, "phone1"),
+                      },
+                    ]
                   : []),
                 ...(settings.phone2
-                  ? [{ text: settings.phone2, href: telHref(settings.phone2) }]
+                  ? [
+                      {
+                        text: settings.phone2,
+                        href: telHref(settings.phone2),
+                        label: getContactPhoneName(settings.content_en, "phone2"),
+                      },
+                    ]
                   : []),
               ]}
             />
@@ -1271,7 +1284,7 @@ function ContactRow({
 }: {
   icon: React.ComponentType<{ className?: string }>;
   title: string;
-  lines: { text: string; href?: string }[];
+  lines: { text: string; href?: string; label?: string }[];
 }) {
   return (
     <div className="flex items-start gap-4 rounded-2xl border border-border bg-card p-6 shadow-sm">
@@ -1291,6 +1304,9 @@ function ContactRow({
                 className="block text-base font-medium text-navy hover:text-gold"
               >
                 {l.text}
+                {l.label && (
+                  <span className="ml-2 text-sm font-normal text-muted-foreground">{l.label}</span>
+                )}
               </a>
             ) : (
               <div key={i} className="text-sm text-foreground/70">
@@ -1315,6 +1331,8 @@ function Footer({
 }) {
   const { language, t } = useLanguage();
   const translate = useTranslateContent();
+  const phone1Name = getContactPhoneName(settings.content_en, "phone1");
+  const phone2Name = getContactPhoneName(settings.content_en, "phone2");
   const nav = (settings.nav_links ?? []).filter((link) =>
     isHomeSectionLinkVisible(link.href, sectionVisibility),
   );
@@ -1369,6 +1387,7 @@ function Footer({
               <li>
                 <a href={telHref(settings.phone1)} className="hover:text-gold">
                   {settings.phone1}
+                  {phone1Name && <span className="ml-2 text-white/60">{phone1Name}</span>}
                 </a>
               </li>
             )}
@@ -1376,6 +1395,7 @@ function Footer({
               <li>
                 <a href={telHref(settings.phone2)} className="hover:text-gold">
                   {settings.phone2}
+                  {phone2Name && <span className="ml-2 text-white/60">{phone2Name}</span>}
                 </a>
               </li>
             )}

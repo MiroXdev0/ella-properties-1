@@ -25,6 +25,18 @@ const SIDEBAR_WIDTH_MOBILE = "18rem";
 const SIDEBAR_WIDTH_ICON = "3rem";
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
 
+function readSidebarCookie(): boolean | null {
+  const value = document.cookie
+    .split(";")
+    .map((cookie) => cookie.trim())
+    .find((cookie) => cookie.startsWith(`${SIDEBAR_COOKIE_NAME}=`))
+    ?.slice(SIDEBAR_COOKIE_NAME.length + 1);
+
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return null;
+}
+
 type SidebarContextProps = {
   state: "expanded" | "collapsed";
   open: boolean;
@@ -73,6 +85,13 @@ const SidebarProvider = React.forwardRef<
     // We use openProp and setOpenProp for control from outside the component.
     const [_open, _setOpen] = React.useState(defaultOpen);
     const open = openProp ?? _open;
+
+    React.useEffect(() => {
+      if (openProp !== undefined) return;
+      const savedOpen = readSidebarCookie();
+      if (savedOpen !== null) _setOpen(savedOpen);
+    }, [openProp]);
+
     const setOpen = React.useCallback(
       (value: boolean | ((value: boolean) => boolean)) => {
         const openState = typeof value === "function" ? value(open) : value;
@@ -83,7 +102,8 @@ const SidebarProvider = React.forwardRef<
         }
 
         // This sets the cookie to keep the sidebar state.
-        document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
+        const secure = window.location.protocol === "https:" ? "; secure" : "";
+        document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}; samesite=lax${secure}`;
       },
       [setOpenProp, open],
     );
@@ -742,9 +762,3 @@ export {
   SidebarTrigger,
   useSidebar,
 };
-
-
-
-
-
-

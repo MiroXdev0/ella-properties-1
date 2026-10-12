@@ -19,9 +19,25 @@ export function ConsentBanner() {
   const { language, t } = useLanguage();
   const [open, setOpen] = useState(false);
   const [media, setMedia] = useState(false);
+  const [storageError, setStorageError] = useState(false);
+
+  function handleSaveConsent(allowMedia: boolean) {
+    setStorageError(false);
+    try {
+      saveConsent(allowMedia);
+      setOpen(false);
+    } catch (error) {
+      console.error(
+        "[consent] Unable to save consent preferences",
+        error instanceof Error ? error.message : "Unknown storage error",
+      );
+      setStorageError(true);
+    }
+  }
 
   useEffect(() => {
     const h = () => {
+      setStorageError(false);
       setMedia(consent?.media ?? false);
       setOpen(true);
     };
@@ -51,14 +67,20 @@ export function ConsentBanner() {
               {t("consent.privacy")}
             </Link>
           </p>
+          {storageError && (
+            <p className="mt-3 text-sm text-destructive" role="alert">
+              {t("consent.storageError")}
+            </p>
+          )}
           <div className="mt-4 flex flex-wrap gap-2">
-            <Button onClick={() => saveConsent(true)}>{t("consent.acceptAll")}</Button>
-            <Button variant="outline" onClick={() => saveConsent(false)}>
+            <Button onClick={() => handleSaveConsent(true)}>{t("consent.acceptAll")}</Button>
+            <Button variant="outline" onClick={() => handleSaveConsent(false)}>
               {t("consent.necessaryOnly")}
             </Button>
             <Button
               variant="ghost"
               onClick={() => {
+                setStorageError(false);
                 setMedia(false);
                 setOpen(true);
               }}
@@ -73,17 +95,18 @@ export function ConsentBanner() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t("consent.dialogTitle")}</DialogTitle>
-            <DialogDescription>
-              {t("consent.dialogDescription")}
-            </DialogDescription>
+            <DialogDescription>{t("consent.dialogDescription")}</DialogDescription>
           </DialogHeader>
+          {storageError && (
+            <p className="text-sm text-destructive" role="alert">
+              {t("consent.storageError")}
+            </p>
+          )}
           <div className="space-y-4">
             <div className="flex items-start justify-between gap-4 rounded-lg border border-border p-4">
               <div>
                 <div className="font-medium text-foreground">{t("consent.necessary")}</div>
-                <p className="text-sm text-muted-foreground">
-                  {t("consent.necessaryDescription")}
-                </p>
+                <p className="text-sm text-muted-foreground">{t("consent.necessaryDescription")}</p>
               </div>
               <Switch checked disabled aria-label={t("consent.necessaryAria")} />
             </div>
@@ -92,26 +115,19 @@ export function ConsentBanner() {
                 <label htmlFor="consent-media" className="font-medium text-foreground">
                   {t("consent.external")}
                 </label>
-                <p className="text-sm text-muted-foreground">
-                  {t("consent.externalDescription")}
-                </p>
+                <p className="text-sm text-muted-foreground">{t("consent.externalDescription")}</p>
               </div>
               <Switch id="consent-media" checked={media} onCheckedChange={setMedia} />
             </div>
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => { saveConsent(false); setOpen(false); }}>
+            <Button variant="outline" onClick={() => handleSaveConsent(false)}>
               {t("consent.rejectAll")}
             </Button>
-            <Button onClick={() => { saveConsent(media); setOpen(false); }}>{t("consent.save")}</Button>
+            <Button onClick={() => handleSaveConsent(media)}>{t("consent.save")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
   );
 }
-
-
-
-
-

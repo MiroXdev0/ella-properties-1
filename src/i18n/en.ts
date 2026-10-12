@@ -236,7 +236,7 @@ export const en: Record<keyof typeof bg, string> = {
   "property.mapTitle": "Property map",
   "consent.title": "Your privacy",
   "consent.description":
-    "We use only essential local storage to make the website work. Maps and videos from external services (Google Maps, YouTube, Vimeo) may use cookies and load only with your consent. We do not use analytics or advertising.",
+    "We use essential local storage and remember the admin menu preference. Maps and videos from external services (Google Maps, YouTube, Vimeo) may use cookies and load only with your consent. We do not use analytics or advertising.",
   "consent.policy": "Cookie Policy",
   "consent.privacy": "Privacy",
   "consent.acceptAll": "Accept all",
@@ -246,11 +246,17 @@ export const en: Record<keyof typeof bg, string> = {
   "consent.dialogDescription":
     "You can change or withdraw your consent at any time using the “Cookie settings” link at the bottom of the website.",
   "consent.necessary": "Essential",
-  "consent.necessaryDescription": "Admin sign-in and remembering this choice. Always active.",
+  "consent.necessaryDescription":
+    "Admin sign-in, remembering this choice, and saving the admin menu preference. Always active.",
   "consent.necessaryAria": "Essential — always active",
   "consent.external": "External content",
   "consent.externalDescription":
     "Maps (Google Maps) and videos (YouTube, Vimeo). These services may use their own cookies.",
+  "consent.embedNotice": "Content from {service} may use cookies and loads only with your consent.",
+  "consent.loadExternal": "Load content",
+  "consent.openExternal": "Open {service} in a new window",
+  "consent.storageError":
+    "We could not save your choice. External content remains blocked; check your browser's storage settings and try again.",
   "consent.rejectAll": "Reject all",
   "consent.save": "Save choices",
   "legal.skip": "Skip to content",

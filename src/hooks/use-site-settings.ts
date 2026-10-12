@@ -8,6 +8,7 @@ import type { Language } from "@/i18n/LanguageProvider";
 export type NavLink = { href: string; label: string };
 export type ServiceItem = { icon: string; title: string; items: string[] };
 export type TestimonialItem = { name: string; role: string; text: string };
+export type ContactPhoneKey = "phone1" | "phone2";
 export type HomeSectionVisibility = Record<
   "about" | "services" | "catalog" | "why" | "testimonials" | "contact",
   boolean
@@ -21,6 +22,16 @@ export const DEFAULT_HOME_SECTION_VISIBILITY: HomeSectionVisibility = {
   testimonials: true,
   contact: true,
 };
+
+export function getContactPhoneName(
+  content: Record<string, unknown> | null | undefined,
+  phone: ContactPhoneKey,
+): string {
+  const names = content?.contact_phone_names;
+  if (!names || typeof names !== "object" || Array.isArray(names)) return "";
+  const name = (names as Record<string, unknown>)[phone];
+  return typeof name === "string" ? name.trim() : "";
+}
 
 export function getHomeSectionVisibility(content: Record<string, unknown> | null | undefined) {
   const stored = content?.site_section_visibility;

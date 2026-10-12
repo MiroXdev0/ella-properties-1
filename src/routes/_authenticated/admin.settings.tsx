@@ -25,6 +25,7 @@ import { fileExt, isImageFile, MAX_UPLOAD_BYTES, mediaUrl } from "@/lib/media";
 import { adminMediaPreviewUrl } from "@/lib/admin/media";
 import {
   DEFAULT_HOME_SECTION_VISIBILITY,
+  type ContactPhoneKey,
   getHomeSectionVisibility,
   type HomeSectionVisibility,
 } from "@/hooks/use-site-settings";
@@ -214,6 +215,15 @@ function SettingsAdmin() {
     setForm((f) => ({ ...f, [k]: v }));
   const setEnglish = (key: string, value: Json) =>
     setContentEn((current) => ({ ...current, [key]: value }));
+  const setContactPhoneName = (phone: ContactPhoneKey, value: string) =>
+    setContentEn((current) => {
+      const storedNames = current.contact_phone_names;
+      const names =
+        storedNames && typeof storedNames === "object" && !Array.isArray(storedNames)
+          ? (storedNames as Record<string, Json>)
+          : {};
+      return { ...current, contact_phone_names: { ...names, [phone]: value } };
+    });
   const englishText = (key: LocalizedTextKey) =>
     typeof contentEn[key] === "string" ? (contentEn[key] as string) : "";
 
@@ -494,8 +504,38 @@ function SettingsAdmin() {
               <Row label="Телефон 1">
                 <Input value={form.phone1 ?? ""} onChange={(e) => set("phone1", e.target.value)} />
               </Row>
+              <Row label="Име до телефон 1 (по желание)">
+                <Input
+                  value={
+                    contentEn.contact_phone_names &&
+                    typeof contentEn.contact_phone_names === "object" &&
+                    !Array.isArray(contentEn.contact_phone_names) &&
+                    typeof contentEn.contact_phone_names.phone1 === "string"
+                      ? contentEn.contact_phone_names.phone1
+                      : ""
+                  }
+                  onChange={(e) => setContactPhoneName("phone1", e.target.value)}
+                  placeholder="напр. Елена"
+                  maxLength={80}
+                />
+              </Row>
               <Row label="Телефон 2">
                 <Input value={form.phone2 ?? ""} onChange={(e) => set("phone2", e.target.value)} />
+              </Row>
+              <Row label="Име до телефон 2 (по желание)">
+                <Input
+                  value={
+                    contentEn.contact_phone_names &&
+                    typeof contentEn.contact_phone_names === "object" &&
+                    !Array.isArray(contentEn.contact_phone_names) &&
+                    typeof contentEn.contact_phone_names.phone2 === "string"
+                      ? contentEn.contact_phone_names.phone2
+                      : ""
+                  }
+                  onChange={(e) => setContactPhoneName("phone2", e.target.value)}
+                  placeholder="напр. Иван"
+                  maxLength={80}
+                />
               </Row>
               <Row label="Имейл">
                 <Input

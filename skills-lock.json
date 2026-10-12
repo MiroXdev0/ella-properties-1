@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "chrome-devtools": {
+      "source": "github/awesome-copilot",
+      "sourceType": "github",
+      "skillPath": "skills/chrome-devtools/SKILL.md",
+      "computedHash": "85d9c4ef94e00ddfc937d50aab72a307e80b98bc7e6744ec6e239ef68819c2d7"
+    },
     "core-design": {
       "source": "inhaq/core-design-skills",
       "sourceType": "github",
@@ -13,6 +19,12 @@
       "skillPath": "skills/premium-frontend-ui/SKILL.md",
       "computedHash": "e7f3d02a0233beafdd6fe5335427388109b9699ebcdc6a8782a8bada2826d916"
     },
+    "security-review": {
+      "source": "github/awesome-copilot",
+      "sourceType": "github",
+      "skillPath": "skills/security-review/SKILL.md",
+      "computedHash": "9b1791054c648b84ca424fc1342dede2e04759dc73436bb91d21675d5a4c13ea"
+    },
     "supabase": {
       "source": "supabase/agent-skills",
       "sourceType": "github",
@@ -24,6 +36,18 @@
       "sourceType": "github",
       "skillPath": "skills/supabase-postgres-best-practices/SKILL.md",
       "computedHash": "128fac78002d916c8ca908245d398e634f540d8bcf20915b2b2359aeb18eba59"
+    },
+    "web-design-reviewer": {
+      "source": "github/awesome-copilot",
+      "sourceType": "github",
+      "skillPath": "skills/web-design-reviewer/SKILL.md",
+      "computedHash": "4a05e32553a1dc916ee4f68f709d478c17de6b8ce184932f56f2b8646f3d4986"
+    },
+    "webapp-testing": {
+      "source": "github/awesome-copilot",
+      "sourceType": "github",
+      "skillPath": "skills/webapp-testing/SKILL.md",
+      "computedHash": "e386cf78f5a002c8fa684066f933c670571f3cfb43b0d66bfc82050d74d6ea64"
     }
   }
 }
