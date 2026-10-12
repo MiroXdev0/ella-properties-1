@@ -266,7 +266,7 @@ function Header({
   };
   return (
     <header className="sticky top-0 z-40 border-b border-border/60 bg-background/85 backdrop-blur">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-5 lg:px-8">
+      <div className="mx-auto flex max-w-screen-2xl items-center justify-between gap-4 px-4 py-3 sm:px-5 lg:px-8">
         <a
           href="#top"
           aria-label={t("nav.home")}
@@ -323,7 +323,7 @@ function Header({
       </div>
       {open && (
         <div className="border-t border-border/60 bg-background lg:hidden">
-          <nav className="mx-auto flex max-w-7xl flex-col gap-1 px-4 py-3 sm:px-5">
+          <nav className="mx-auto flex max-w-screen-2xl flex-col gap-1 px-4 py-3 sm:px-5">
             {nav.map((n) => (
               <a
                 key={n.href}
@@ -418,7 +418,7 @@ function Hero({
         />
         <div className="absolute inset-0 bg-gradient-to-b from-navy-deep/85 via-navy-deep/55 to-navy-deep/85" />
         <div className="absolute inset-0 flex items-center">
-          <div className="mx-auto w-full max-w-7xl px-4 sm:px-5 lg:px-8">
+          <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-5 lg:px-8">
             <div className="max-w-2xl">
               <span className="inline-flex items-center gap-2 rounded-full border border-gold/40 bg-white/5 px-3 py-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-gold backdrop-blur sm:px-4 sm:text-xs sm:tracking-[0.2em]">
                 <span className="h-1.5 w-1.5 rounded-full bg-gold" />
@@ -492,7 +492,7 @@ function About({ settings }: { settings: PublicSettings }) {
   return (
     <section id="about" className="bg-background py-16 sm:py-20 lg:py-32">
       <div
-        className={`mx-auto grid max-w-7xl gap-10 px-4 sm:gap-14 sm:px-5 lg:gap-20 lg:px-8 ${stats.length > 0 ? "lg:grid-cols-2" : ""}`}
+        className={`mx-auto grid max-w-screen-2xl gap-10 px-4 sm:gap-14 sm:px-5 lg:gap-20 lg:px-8 ${stats.length > 0 ? "lg:grid-cols-2" : ""}`}
       >
         <div>
           <SectionEyebrow>{translate(settings.about_eyebrow)}</SectionEyebrow>
@@ -541,7 +541,7 @@ function Services({ settings }: { settings: PublicSettings }) {
         services.length === 0 && settings.services_image_url ? "pb-0" : "pb-12 sm:pb-14 lg:pb-20",
       )}
     >
-      <div className="mx-auto max-w-7xl px-4 sm:px-5 lg:px-8">
+      <div className="mx-auto max-w-screen-2xl px-4 sm:px-5 lg:px-8">
         <div className="flex flex-col items-start justify-between gap-6 lg:flex-row lg:items-end">
           <div className="max-w-2xl">
             <SectionEyebrow>{translate(settings.services_eyebrow)}</SectionEyebrow>
@@ -657,7 +657,7 @@ function Catalog({
 
   return (
     <section id="catalog" className="bg-background py-16 sm:py-20 lg:py-32">
-      <div className="mx-auto max-w-7xl px-4 sm:px-5 lg:px-8">
+      <div className="mx-auto max-w-screen-2xl px-4 sm:px-5 lg:px-8">
         <SectionEyebrow>{settings.catalog_eyebrow}</SectionEyebrow>
         <h2 className="mt-4 font-display text-3xl font-medium text-navy sm:text-4xl md:text-5xl">
           {settings.catalog_title}
@@ -686,7 +686,7 @@ function Catalog({
           </nav>
         )}
 
-        <div className="mt-8 grid gap-4 rounded-2xl border border-border bg-card p-4 sm:mt-10 sm:p-5 shadow-sm sm:grid-cols-2 lg:grid-cols-6">
+        <div className="mt-8 grid gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm sm:mt-10 sm:grid-cols-2 sm:p-5 lg:grid-cols-6 2xl:grid-cols-7">
           <FilterSelect
             label={t("home.filter.type")}
             value={type}
@@ -968,7 +968,7 @@ function WhyUs({ settings }: { settings: PublicSettings }) {
           backgroundSize: "32px 32px",
         }}
       />
-      <div className="relative mx-auto max-w-7xl px-4 sm:px-5 lg:px-8">
+      <div className="relative mx-auto max-w-screen-2xl px-4 sm:px-5 lg:px-8">
         <SectionEyebrow tone="gold">{translate(settings.why_eyebrow)}</SectionEyebrow>
         <h2 className="mt-4 max-w-3xl font-display text-3xl font-medium sm:text-4xl md:text-5xl">
           {translate(settings.why_title)}
@@ -1004,7 +1004,7 @@ function Testimonials({ settings }: { settings: PublicSettings }) {
 
   return (
     <section id="testimonials" className="bg-background py-16 sm:py-20 lg:py-32">
-      <div className="mx-auto max-w-7xl px-4 sm:px-5 lg:px-8">
+      <div className="mx-auto max-w-screen-2xl px-4 sm:px-5 lg:px-8">
         <div className="max-w-2xl">
           <SectionEyebrow>{translate(settings.testimonials_eyebrow)}</SectionEyebrow>
           <h2 className="mt-4 font-display text-3xl font-medium text-navy sm:text-4xl md:text-5xl">
@@ -1086,7 +1086,7 @@ function Contact({ settings }: { settings: PublicSettings }) {
 
   return (
     <section id="contact" className="bg-muted/50 py-16 sm:py-20 lg:py-32">
-      <div className="mx-auto max-w-7xl px-4 sm:px-5 lg:px-8">
+      <div className="mx-auto max-w-screen-2xl px-4 sm:px-5 lg:px-8">
         <div className="max-w-2xl">
           <SectionEyebrow>{translate(settings.contact_eyebrow)}</SectionEyebrow>
           <h2 className="mt-4 font-display text-3xl font-medium text-navy sm:text-4xl md:text-5xl">
@@ -1095,8 +1095,8 @@ function Contact({ settings }: { settings: PublicSettings }) {
           <p className="mt-4 text-muted-foreground">{translate(settings.contact_subtitle)}</p>
         </div>
 
-        <div className="mt-8 grid gap-6 sm:mt-12 sm:gap-8 lg:grid-cols-6">
-          <div className="space-y-5 lg:col-span-2">
+        <div className="mt-8 grid gap-6 sm:mt-12 sm:gap-8 lg:grid-cols-12">
+          <div className="space-y-5 lg:col-span-4">
             <ContactRow
               icon={Phone}
               title={t("contact.phones")}
@@ -1165,7 +1165,7 @@ function Contact({ settings }: { settings: PublicSettings }) {
 
           <form
             onSubmit={onSubmit}
-            className="relative rounded-2xl border border-border bg-card p-7 shadow-sm lg:col-span-3 lg:p-10"
+            className="relative rounded-2xl border border-border bg-card p-7 shadow-sm lg:col-span-7 lg:p-10"
           >
             {/* Honeypot: hidden from real users, bots tend to fill it in */}
             <div className="absolute -left-[9999px] h-0 w-0 overflow-hidden" aria-hidden="true">
@@ -1352,7 +1352,7 @@ function Footer({
   );
   return (
     <footer className="border-t border-border bg-navy-deep text-white/80">
-      <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-5 sm:py-14 sm:grid-cols-2 lg:grid-cols-4 lg:px-8">
+      <div className="mx-auto grid max-w-screen-2xl gap-10 px-4 py-12 sm:px-5 sm:py-14 sm:grid-cols-2 lg:grid-cols-4 lg:px-8">
         <div>
           <div className="flex items-center gap-3">
             <img
