@@ -534,7 +534,13 @@ function Services({ settings }: { settings: PublicSettings }) {
   const translate = useTranslateContent();
   const services = (settings.services ?? []).filter((service) => service.title.trim());
   return (
-    <section id="services" className="bg-muted/50 py-16 sm:py-20 lg:py-32">
+    <section
+      id="services"
+      className={cn(
+        "bg-muted/50 pt-16 sm:pt-20 lg:pt-32",
+        services.length === 0 && settings.services_image_url ? "pb-0" : "pb-12 sm:pb-14 lg:pb-20",
+      )}
+    >
       <div className="mx-auto max-w-7xl px-4 sm:px-5 lg:px-8">
         <div className="flex flex-col items-start justify-between gap-6 lg:flex-row lg:items-end">
           <div className="max-w-2xl">
@@ -545,32 +551,34 @@ function Services({ settings }: { settings: PublicSettings }) {
           </div>
           <p className="max-w-md text-muted-foreground">{translate(settings.services_subtitle)}</p>
         </div>
-        <div className="mt-8 grid gap-5 sm:mt-12 sm:grid-cols-2 lg:grid-cols-4">
-          {services.map((s) => {
-            const Icon = iconOf(s.icon);
-            return (
-              <div
-                key={s.title}
-                className="group flex flex-col rounded-2xl border border-border bg-card p-6 transition-all sm:p-7 hover:-translate-y-1 hover:border-gold hover:shadow-xl"
-              >
-                <div className="grid h-12 w-12 place-items-center rounded-xl bg-navy text-gold ring-1 ring-gold/30">
-                  <Icon className="h-5 w-5" />
+        {services.length > 0 && (
+          <div className="mt-8 grid gap-5 sm:mt-12 sm:grid-cols-2 lg:grid-cols-4">
+            {services.map((s) => {
+              const Icon = iconOf(s.icon);
+              return (
+                <div
+                  key={s.title}
+                  className="group flex flex-col rounded-2xl border border-border bg-card p-6 transition-all sm:p-7 hover:-translate-y-1 hover:border-gold hover:shadow-xl"
+                >
+                  <div className="grid h-12 w-12 place-items-center rounded-xl bg-navy text-gold ring-1 ring-gold/30">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <h3 className="mt-6 font-display text-2xl text-navy">{translate(s.title)}</h3>
+                  <ul className="mt-4 space-y-2 text-sm text-foreground/75">
+                    {s.items.map((i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-gold" />
+                        <span>{translate(i)}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                <h3 className="mt-6 font-display text-2xl text-navy">{translate(s.title)}</h3>
-                <ul className="mt-4 space-y-2 text-sm text-foreground/75">
-                  {s.items.map((i) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-gold" />
-                      <span>{translate(i)}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
         {settings.services_image_url && (
-          <div className="mt-8 overflow-hidden rounded-2xl bg-white p-3 shadow-sm sm:mt-12 sm:p-6">
+          <div className="mt-6 overflow-hidden rounded-2xl bg-white p-3 shadow-sm sm:mt-8 sm:p-6">
             {settings.services_image_heading.trim() && (
               <h3 className="mb-4 text-center font-display text-xl font-medium text-navy sm:text-2xl">
                 {translate(settings.services_image_heading)}
