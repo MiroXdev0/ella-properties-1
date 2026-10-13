@@ -21,7 +21,7 @@ export async function fetchPublicProperties(): Promise<Property[]> {
   const { data, error } = await supabase
     .from("properties")
     .select(
-      "id,title,type,layout,status,price,city,district,address,area,yard_area,rooms,floor,description,main_image,is_featured,created_at",
+      "id,title,type,layout,status,price,city,district,area,description,main_image,is_featured,created_at",
     )
     .eq("is_published", true)
     .order("is_featured", { ascending: false })
@@ -34,15 +34,11 @@ export async function fetchPublicProperties(): Promise<Property[]> {
     listing: mapListing(p.status),
     city: p.city?.trim() ?? "",
     district: p.district ?? "",
-    address: p.address?.trim() || undefined,
     price: Number(p.price ?? 0),
     area: Number(p.area ?? 0),
-    yardArea: p.yard_area == null ? null : Number(p.yard_area),
-    rooms: p.rooms,
     layout: (APARTMENT_LAYOUTS as readonly string[]).includes(p.layout ?? "")
       ? (p.layout as ApartmentLayout)
       : undefined,
-    floor: p.floor ?? undefined,
     image: p.main_image || null,
     description: p.description ?? "",
   }));

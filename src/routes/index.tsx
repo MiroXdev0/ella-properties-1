@@ -12,7 +12,6 @@ import {
   Star,
   ArrowRight,
   Maximize2,
-  Layers,
   Facebook,
   Instagram,
   Music2,
@@ -889,10 +888,9 @@ function PropertyCard({ p }: { p: Property }) {
         <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
           <MapPin className="h-3.5 w-3.5" /> {p.city}
           {p.district ? `, ${p.district}` : ""}
-          {p.address ? ` — ${p.address}` : ""}
         </p>
         {p.description && (
-          <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-foreground/75">
+          <p className="mt-3 line-clamp-3 whitespace-pre-line text-sm leading-relaxed text-foreground/75">
             {p.description}
           </p>
         )}
@@ -900,30 +898,6 @@ function PropertyCard({ p }: { p: Property }) {
           <span className="inline-flex items-center gap-1.5">
             <Maximize2 className="h-3.5 w-3.5 text-gold" /> {p.area} м²
           </span>
-          {p.yardArea != null && (
-            <span className="inline-flex items-center gap-1.5">
-              <Maximize2 className="h-3.5 w-3.5 text-gold" /> {t("property.yardArea")}: {p.yardArea}{" "}
-              м²
-            </span>
-          )}
-          {p.floor && (
-            <span className="inline-flex items-center gap-1.5">
-              <Layers className="h-3.5 w-3.5 text-gold" />{" "}
-              {p.type === "Къща"
-                ? t("property.storiesHouse").replace("{count}", p.floor)
-                : t("property.floorValue").replace("{floor}", p.floor)}
-            </span>
-          )}
-          {p.layout && (
-            <span className="inline-flex items-center gap-1.5">
-              <Layers className="h-3.5 w-3.5 text-gold" /> {translate(p.layout)}
-            </span>
-          )}
-          {p.rooms != null && (
-            <span className="inline-flex items-center gap-1.5">
-              <Building2 className="h-3.5 w-3.5 text-gold" /> {t("property.rooms")}: {p.rooms}
-            </span>
-          )}
         </div>
         <div className="mt-5 flex items-end justify-between gap-3">
           <div>

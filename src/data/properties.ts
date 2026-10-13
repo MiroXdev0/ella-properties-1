@@ -16,13 +16,9 @@ export interface Property {
   listing: Listing;
   city: string;
   district: string;
-  address?: string;
   price: number;
   area: number;
-  yardArea?: number | null;
-  rooms?: number | null;
   layout?: ApartmentLayout;
-  floor?: string;
   image: string | null;
   description: string;
 }
