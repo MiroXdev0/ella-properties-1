@@ -4,16 +4,13 @@
 /Logo_Credit_Navigator.png
   Cache-Control: public, max-age=86400
 
-/ella-imoti-logo.png
+/logo-in-site.png
   Cache-Control: public, max-age=86400
 
-/app-icon-192-v2.png
+/logo.ico
   Cache-Control: public, max-age=86400
 
-/app-icon-512-v2.png
-  Cache-Control: public, max-age=86400
-
-/app-icon-maskable-512-v2.png
+/logo-mobile.ico
   Cache-Control: public, max-age=86400
 
 /manifest.webmanifest

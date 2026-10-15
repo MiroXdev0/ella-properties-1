@@ -356,7 +356,7 @@ function Header({
 
 function Logo({ settings }: { settings: PublicSettings }) {
   const name = displayBrandName(settings.brand_name);
-  const logoUrl = publicLogoUrl(settings.logo_url) ?? "/ella-imoti-logo.png";
+  const logoUrl = publicLogoUrl(settings.logo_url) ?? "/logo-in-site.png";
   return (
     <span className="flex min-w-0 items-center">
       <img
@@ -1323,7 +1323,7 @@ function Footer({
   const nav = (settings.nav_links ?? []).filter((link) =>
     isHomeSectionLinkVisible(link.href, sectionVisibility),
   );
-  const logoUrl = publicLogoUrl(settings.logo_url) ?? "/ella-imoti-logo.png";
+  const logoUrl = publicLogoUrl(settings.logo_url) ?? "/logo-in-site.png";
   const brandName = displayBrandName(settings.brand_name);
   const copyright = (settings.footer_copyright || "").replace(
     "{year}",

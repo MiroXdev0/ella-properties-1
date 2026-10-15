@@ -185,7 +185,7 @@
     inset: 0;
     pointer-events: none;
     content: "";
-    background: #0b1e3b url("/ella-imoti-logo.png") center / min(76vw, 340px) auto no-repeat;
+    background: #0b1e3b url("/logo-in-site.png") center / min(76vw, 340px) auto no-repeat;
     animation: pwa-launch-splash 950ms cubic-bezier(0.76, 0, 0.24, 1) 100ms both;
   }
 }

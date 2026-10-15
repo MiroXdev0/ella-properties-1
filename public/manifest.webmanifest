@@ -12,22 +12,10 @@
   "theme_color": "#0B1E3B",
   "icons": [
     {
-      "src": "/app-icon-192-v2.png",
-      "sizes": "192x192",
-      "type": "image/png",
+      "src": "/logo-mobile.ico",
+      "sizes": "16x16 32x32 48x48 64x64 128x128 256x256",
+      "type": "image/x-icon",
       "purpose": "any"
-    },
-    {
-      "src": "/app-icon-512-v2.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/app-icon-maskable-512-v2.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
     }
   ]
 }

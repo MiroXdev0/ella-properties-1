@@ -104,7 +104,7 @@ export const DEFAULT_SETTINGS = {
   about_stat4_value: "",
   about_stat4_label: "",
   allow_registration: true,
-  logo_url: "/ella-imoti-logo.png",
+  logo_url: "/logo-in-site.png",
   phone1: "+359 88 481 6232",
   phone2: "+359 88 438 8022",
   email: "",
