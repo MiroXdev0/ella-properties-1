@@ -40,6 +40,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Toaster } from "@/components/ui/sonner";
+import { ShareProperty } from "@/components/property/ShareProperty";
 import { cn } from "@/lib/utils";
 
 import heroImage from "@/assets/hero-1920.webp";
@@ -312,10 +313,11 @@ function Header({
           <Phone className="h-4 w-4" />
         </a>
         <button
+          type="button"
           aria-label={t("nav.menu")}
           aria-expanded={open}
           onClick={() => setOpen((o) => !o)}
-          className="shrink-0 rounded-md border border-border p-2 lg:hidden"
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-border bg-card transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 lg:hidden"
         >
           {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
@@ -491,29 +493,39 @@ function About({ settings }: { settings: PublicSettings }) {
   return (
     <section id="about" className="bg-background py-16 sm:py-20">
       <div className="mx-auto max-w-6xl px-4 sm:px-5 lg:px-8">
-        <div>
-          <SectionEyebrow>{translate(settings.about_eyebrow)}</SectionEyebrow>
-          <h2 className="mt-4 font-display text-3xl font-medium text-navy sm:text-4xl md:text-5xl">
-            {translate(settings.about_title)}
-          </h2>
-          <p className="mt-6 whitespace-pre-line text-lg leading-relaxed text-foreground/75">
-            {displayCoverageText(settings.about_text, translate, language)}
-          </p>
-          {settings.about_text_secondary && (
-            <p className="mt-4 whitespace-pre-line text-base leading-relaxed text-muted-foreground">
-              {displayCoverageText(settings.about_text_secondary, translate, language)}
-            </p>
+        <div
+          className={cn(
+            "grid gap-10 lg:gap-14",
+            stats.length > 0 &&
+              "lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)] lg:items-center",
           )}
+        >
+          <div>
+            <SectionEyebrow>{translate(settings.about_eyebrow)}</SectionEyebrow>
+            <h2 className="mt-4 font-display text-3xl font-medium text-navy sm:text-4xl md:text-5xl">
+              {translate(settings.about_title)}
+            </h2>
+            <p className="mt-6 max-w-[68ch] whitespace-pre-line text-lg leading-relaxed text-foreground/75">
+              {displayCoverageText(settings.about_text, translate, language)}
+            </p>
+            {settings.about_text_secondary && (
+              <p className="mt-4 max-w-[68ch] whitespace-pre-line text-base leading-relaxed text-muted-foreground">
+                {displayCoverageText(settings.about_text_secondary, translate, language)}
+              </p>
+            )}
+          </div>
         </div>
         {stats.length > 0 && (
-          <div className="grid grid-cols-2 gap-4 sm:gap-5">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
             {stats.map((c) => (
               <div
                 key={`${c.k}-${c.v}`}
-                className="rounded-2xl border border-border bg-card p-6 shadow-sm transition-shadow hover:shadow-md"
+                className="rounded-2xl border border-border/80 bg-card p-5 shadow-sm sm:p-6"
               >
-                <div className="font-display text-3xl text-navy">{c.k}</div>
-                <div className="mt-1 text-sm uppercase tracking-[0.15em] text-muted-foreground">
+                <div className="font-display text-3xl tabular-nums text-navy sm:text-4xl">
+                  {c.k}
+                </div>
+                <div className="mt-1 text-xs uppercase tracking-[0.12em] text-muted-foreground sm:text-sm sm:tracking-[0.15em]">
                   {translate(c.v)}
                 </div>
               </div>
@@ -539,7 +551,7 @@ function Services({ settings }: { settings: PublicSettings }) {
       )}
     >
       <div className="mx-auto max-w-6xl px-4 sm:px-5 lg:px-8">
-        <div className="flex flex-col items-start justify-between gap-6">
+        <div className="flex flex-col items-start justify-between gap-6 lg:flex-row lg:items-end">
           <div className="max-w-2xl">
             <SectionEyebrow>{translate(settings.services_eyebrow)}</SectionEyebrow>
             <h2 className="mt-4 font-display text-3xl font-medium text-navy sm:text-4xl md:text-5xl">
@@ -555,7 +567,7 @@ function Services({ settings }: { settings: PublicSettings }) {
               return (
                 <div
                   key={s.title}
-                  className="group flex flex-col rounded-2xl border border-border bg-card p-6 transition-all sm:p-7 hover:-translate-y-1 hover:border-gold hover:shadow-xl"
+                  className="service-card group flex flex-col rounded-2xl border border-border/80 bg-card p-6 shadow-sm sm:p-7"
                 >
                   <div className="grid h-12 w-12 place-items-center rounded-xl bg-navy text-gold ring-1 ring-gold/30">
                     <Icon className="h-5 w-5" />
@@ -849,7 +861,7 @@ function PropertyCard({ p }: { p: Property }) {
   const translate = useTranslateContent();
   const priceText = new Intl.NumberFormat(language === "en" ? "en-GB" : "bg-BG").format(p.price);
   return (
-    <article className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-[transform,box-shadow] hover:-translate-y-1 hover:shadow-xl">
+    <article className="property-card group relative flex flex-col overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm">
       <Link
         to="/properties/$id"
         params={{ id: p.id }}
@@ -869,7 +881,7 @@ function PropertyCard({ p }: { p: Property }) {
             decoding="async"
             width={1024}
             height={768}
-            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+            className="property-card-image h-full w-full object-cover"
           />
         ) : (
           <div className="h-full w-full bg-muted" aria-hidden="true" />
@@ -881,9 +893,9 @@ function PropertyCard({ p }: { p: Property }) {
           {translate(p.type)}
         </span>
       </div>
-      <div className="pointer-events-none relative z-10 flex flex-1 flex-col p-6">
+      <div className="pointer-events-none relative z-10 flex flex-1 flex-col p-5 sm:p-6">
         <div className="flex items-baseline justify-between gap-3">
-          <h3 className="font-display text-xl text-navy">{p.title}</h3>
+          <h3 className="font-display text-xl font-medium text-navy">{p.title}</h3>
         </div>
         <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
           <MapPin className="h-3.5 w-3.5" /> {p.city}
@@ -899,19 +911,19 @@ function PropertyCard({ p }: { p: Property }) {
             <Maximize2 className="h-3.5 w-3.5 text-gold" /> {p.area} м²
           </span>
         </div>
-        <div className="mt-5 flex items-end justify-between gap-3">
+        <div className="mt-5 flex flex-wrap items-end justify-between gap-3">
           <div>
             <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
               {t("property.price")}
             </div>
-            <div className="font-display text-2xl font-medium text-navy">
+            <div className="font-display text-2xl font-medium tabular-nums text-navy">
               € {priceText}
               {p.listing === "Наем" && (
                 <span className="text-sm text-muted-foreground"> {t("property.month")}</span>
               )}
             </div>
           </div>
-          <div className="pointer-events-auto relative z-10 flex gap-2">
+          <div className="pointer-events-auto relative z-10 flex flex-wrap justify-end gap-2">
             <Button asChild variant="outline" size="sm" className="min-h-11 rounded-full">
               <Link to="/properties/$id" params={{ id: p.id }}>
                 {t("property.more")}
@@ -924,6 +936,7 @@ function PropertyCard({ p }: { p: Property }) {
             >
               <a href="#contact">{t("property.viewing")}</a>
             </Button>
+            <ShareProperty property={p} compact />
           </div>
         </div>
       </div>
@@ -1074,7 +1087,7 @@ function Contact({ settings }: { settings: PublicSettings }) {
           <p className="mt-4 text-muted-foreground">{translate(settings.contact_subtitle)}</p>
         </div>
 
-        <div className="mt-8 grid gap-6 sm:mt-12 sm:gap-8">
+        <div className="mt-8 grid gap-6 sm:mt-12 sm:gap-8 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:items-start">
           <div className="space-y-5">
             <ContactRow
               icon={Phone}

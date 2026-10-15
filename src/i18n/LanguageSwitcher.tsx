@@ -17,7 +17,7 @@ export function LanguageSwitcher({ className = "" }: { className?: string }) {
           aria-pressed={language === option}
           aria-label={option === "bg" ? t("language.bulgarian") : t("language.english")}
           onClick={() => setLanguage(option)}
-          className={`min-w-9 rounded-full px-2 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+          className={`min-h-11 min-w-11 rounded-full px-2 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
             language === option ? "bg-navy text-white" : "text-foreground/70 hover:text-foreground"
           }`}
         >

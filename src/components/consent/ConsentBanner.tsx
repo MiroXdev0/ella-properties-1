@@ -54,11 +54,13 @@ export function ConsentBanner() {
           role="region"
           lang={language}
           aria-label={`${t("consent.title")}: ${t("consent.external")}`}
-          className="fixed inset-x-3 bottom-3 z-[60] mx-auto max-w-3xl rounded-2xl border border-border bg-card p-5 text-card-foreground shadow-2xl sm:inset-x-6 sm:p-6"
+          className="fixed inset-x-3 bottom-3 z-[60] mx-auto max-h-[calc(100dvh-1.5rem)] max-w-3xl overflow-y-auto rounded-2xl border border-border bg-card p-4 text-card-foreground shadow-2xl sm:inset-x-6 sm:p-6"
         >
-          <h2 className="font-display text-lg text-foreground">{t("consent.title")}</h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {t("consent.description")}{" "}
+          <h2 className="font-display text-base text-foreground sm:text-lg">
+            {t("consent.title")}
+          </h2>
+          <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground sm:mt-2 sm:text-sm">
+            {t("consent.bannerDescription")}{" "}
             <Link to="/cookies" className="underline underline-offset-2 hover:text-foreground">
               {t("consent.policy")}
             </Link>
@@ -72,13 +74,23 @@ export function ConsentBanner() {
               {t("consent.storageError")}
             </p>
           )}
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Button onClick={() => handleSaveConsent(true)}>{t("consent.acceptAll")}</Button>
-            <Button variant="outline" onClick={() => handleSaveConsent(false)}>
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:flex sm:flex-wrap">
+            <Button
+              onClick={() => handleSaveConsent(true)}
+              className="w-full whitespace-normal text-xs sm:w-auto sm:text-sm"
+            >
+              {t("consent.acceptAll")}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => handleSaveConsent(false)}
+              className="w-full whitespace-normal text-xs sm:w-auto sm:text-sm"
+            >
               {t("consent.necessaryOnly")}
             </Button>
             <Button
               variant="ghost"
+              className="col-span-2 w-full justify-start px-2 text-xs sm:col-span-1 sm:w-auto sm:justify-center sm:px-4 sm:text-sm"
               onClick={() => {
                 setStorageError(false);
                 setMedia(false);

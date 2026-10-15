@@ -25,6 +25,9 @@ import { ConsentEmbed } from "@/components/consent/ConsentEmbed";
 import { SITE_URL } from "@/lib/seo";
 import { useLanguage, useTranslateContent } from "@/i18n/LanguageProvider";
 import { LanguageSwitcher } from "@/i18n/LanguageSwitcher";
+import { ShareProperty } from "@/components/property/ShareProperty";
+import { Toaster } from "@/components/ui/sonner";
+import heroImage from "@/assets/hero-1920.webp";
 
 type Media = { url: string; kind: "image" | "video" };
 
@@ -114,8 +117,8 @@ export const Route = createFileRoute("/properties/$id")({
       };
     }
     const url = `${SITE_URL}/properties/${encodeURIComponent(params.id)}`;
-    const image = loaderData.media.find((item) => item.kind === "image")?.url;
-    const imageUrl = image ? new URL(image, SITE_URL).href : undefined;
+    const image = loaderData.media.find((item) => item.kind === "image")?.url ?? heroImage;
+    const imageUrl = new URL(image, SITE_URL).href;
     const title = (loaderData.seoTitle || `${loaderData.title} — ${loaderData.city}`)
       .replace(/\s+/g, " ")
       .trim()
@@ -136,12 +139,14 @@ export const Route = createFileRoute("/properties/$id")({
         { property: "og:description", content: desc },
         { property: "og:type", content: "article" },
         { property: "og:url", content: url },
-        ...(imageUrl ? [{ property: "og:image", content: imageUrl }] : []),
-        ...(imageUrl ? [{ property: "og:image:alt", content: title }] : []),
+        { property: "og:site_name", content: "Елла Недвижими Имоти" },
+        { property: "og:image", content: imageUrl },
+        { property: "og:image:alt", content: title },
         { name: "twitter:title", content: title },
         { name: "twitter:description", content: desc },
-        ...(imageUrl ? [{ name: "twitter:image", content: imageUrl }] : []),
-        { name: "twitter:card", content: imageUrl ? "summary_large_image" : "summary" },
+        { name: "twitter:image", content: imageUrl },
+        { name: "twitter:image:alt", content: title },
+        { name: "twitter:card", content: "summary_large_image" },
       ],
       links: [{ rel: "canonical", href: url }],
       scripts: [
@@ -259,7 +264,12 @@ function PropertyDetail() {
           </span>
         </div>
 
-        <h1 className="mt-3 font-display text-2xl font-medium text-navy sm:text-4xl">{p.title}</h1>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <h1 className="min-w-0 flex-1 font-display text-2xl font-medium text-navy sm:text-4xl">
+            {p.title}
+          </h1>
+          <ShareProperty property={p} />
+        </div>
         <p className="mt-2 flex items-center gap-1.5 text-sm text-muted-foreground">
           <MapPin className="h-4 w-4" /> {p.city}
           {p.district ? `, ${p.district}` : ""}
@@ -609,6 +619,7 @@ function PropertyDetail() {
           </aside>
         </div>
       </div>
+      <Toaster position="top-center" />
     </main>
   );
 }
