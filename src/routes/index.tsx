@@ -1269,12 +1269,22 @@ function PropertyFilterFields(props: PropertyFilterFieldsProps) {
         />
       )}
       {(props.showAll || props.primaryOnly) && (
-        <FilterSelect
-          label={t("home.filter.type")}
-          value={props.type}
-          onChange={setType}
-          options={PROPERTY_TYPES as string[]}
-        />
+        <div className="flex min-w-0 flex-col gap-3">
+          <FilterSelect
+            label={t("home.filter.type")}
+            value={props.type}
+            onChange={setType}
+            options={PROPERTY_TYPES as string[]}
+          />
+          {props.type === "Апартамент" && (
+            <FilterSelect
+              label={t("home.filter.layout")}
+              value={props.layout}
+              onChange={props.setLayout}
+              options={["Всички", ...APARTMENT_LAYOUTS]}
+            />
+          )}
+        </div>
       )}
       {(props.showAll || props.primaryOnly) && (
         <FilterSelect
@@ -1292,14 +1302,6 @@ function PropertyFilterFields(props: PropertyFilterFieldsProps) {
             onChange={props.setDistrict}
             options={props.districts}
           />
-          {props.type === "Апартамент" && (
-            <FilterSelect
-              label={t("home.filter.layout")}
-              value={props.layout}
-              onChange={props.setLayout}
-              options={["Всички", ...APARTMENT_LAYOUTS]}
-            />
-          )}
           <NumberField
             id={`${props.idPrefix}-min-area`}
             label={t("home.filter.minArea")}
