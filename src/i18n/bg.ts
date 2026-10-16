@@ -207,7 +207,7 @@ export const bg = {
   "footer.terms": "Общи условия",
   "footer.dataRights": "Права върху личните данни",
   "footer.cookieSettings": "Настройки на бисквитките",
-  "footer.installApp": "Инсталирай приложението",
+  "footer.installApp": "Изтегляне на приложението",
   "pwa.installTitle": "Инсталиране на Елла Имоти",
   "pwa.alreadyInstalled": "Приложението вече е инсталирано на това устройство.",
   "pwa.iosInstructions":
