@@ -284,8 +284,8 @@ function PropertyDetail() {
           </span>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="min-w-0 flex-1 font-display text-2xl font-medium text-navy sm:text-4xl">
+        <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
+          <h1 className="min-w-0 flex-1 font-display text-3xl font-medium leading-tight text-navy sm:text-4xl lg:text-5xl">
             {p.title}
           </h1>
           <ShareProperty property={p} />
@@ -298,7 +298,7 @@ function PropertyDetail() {
 
         {/* Gallery */}
         {current && (
-          <div className="mt-6 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+          <div className="mt-6 overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm">
             <div
               role="group"
               aria-label={
@@ -368,6 +368,7 @@ function PropertyDetail() {
                     alt={p.title}
                     draggable={false}
                     decoding="async"
+                    fetchPriority={active === 0 ? "high" : "auto"}
                     className="h-full w-full select-none object-cover"
                   />
                   <span className="absolute right-3 top-3 grid h-11 w-11 place-items-center rounded-full bg-navy/80 text-white opacity-0 shadow-md transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
@@ -418,9 +419,21 @@ function PropertyDetail() {
                     }`}
                   >
                     {m.kind === "video" ? (
-                      <video src={m.url} muted playsInline className="h-full w-full object-cover" />
+                      <video
+                        src={m.url}
+                        muted
+                        playsInline
+                        preload="none"
+                        className="h-full w-full object-cover"
+                      />
                     ) : (
-                      <img src={m.url} alt="" className="h-full w-full object-cover" />
+                      <img
+                        src={m.url}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        className="h-full w-full object-cover"
+                      />
                     )}
                   </button>
                 ))}
@@ -565,7 +578,7 @@ function PropertyDetail() {
             </div>
 
             <h2 className="mt-8 font-display text-xl text-navy">{t("property.description")}</h2>
-            <p className="mt-3 whitespace-pre-line text-foreground/80">
+            <p className="mt-3 max-w-3xl whitespace-pre-line text-[15px] leading-7 text-foreground/80">
               {p.description || t("property.contactForInfo")}
             </p>
 
@@ -610,7 +623,7 @@ function PropertyDetail() {
             )}
           </div>
 
-          <aside className="h-fit rounded-2xl border border-border bg-card p-6 shadow-sm lg:sticky lg:top-6">
+          <aside className="h-fit rounded-xl border border-border/80 bg-card p-5 shadow-sm sm:p-6 lg:sticky lg:top-24">
             <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
               {t("property.price")}
             </div>

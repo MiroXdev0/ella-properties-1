@@ -25,6 +25,8 @@ import {
   Handshake,
   Briefcase,
   Clock3,
+  Search,
+  SlidersHorizontal,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -40,6 +42,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Toaster } from "@/components/ui/sonner";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { ShareProperty } from "@/components/property/ShareProperty";
 import { cn } from "@/lib/utils";
 
@@ -415,20 +424,19 @@ function Hero({
           height={1280}
           fetchPriority="high"
           decoding="async"
-          className="h-[88svh] max-h-[860px] min-h-[520px] w-full object-cover sm:h-[78vh] sm:min-h-[560px]"
+          className="h-[min(88svh,860px)] min-h-[520px] w-full object-cover object-[58%_center] sm:h-[min(82vh,900px)] sm:min-h-[600px]"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-navy-deep/85 via-navy-deep/55 to-navy-deep/85" />
-        <div className="absolute inset-0 flex items-center">
+        <div className="absolute inset-0 bg-gradient-to-b from-navy-deep/60 via-navy-deep/30 to-navy-deep/85" />
+        <div className="absolute inset-0 flex items-end pb-14 sm:items-center sm:pb-0">
           <div className="mx-auto w-full max-w-6xl px-4 sm:px-5 lg:px-8">
-            <div className="max-w-2xl">
-              <span className="inline-flex items-center gap-2 rounded-full border border-gold/40 bg-white/5 px-3 py-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-gold backdrop-blur sm:px-4 sm:text-xs sm:tracking-[0.2em]">
-                <span className="h-1.5 w-1.5 rounded-full bg-gold" />
+            <div className="max-w-2xl border-l border-gold/75 pl-5 sm:border-l-2 sm:pl-8">
+              <span className="inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-gold sm:text-xs">
                 {displayCoverageText(settings.hero_eyebrow, translate, language)}
               </span>
-              <h1 className="mt-5 font-display text-[2rem] font-medium leading-[1.08] text-white sm:mt-6 sm:text-4xl lg:text-5xl">
+              <h1 className="mt-4 max-w-[15ch] font-display text-[2.25rem] font-medium leading-[1.03] text-white sm:mt-5 sm:text-5xl lg:text-6xl">
                 {translate(settings.hero_title)}
               </h1>
-              <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-white/80 sm:mt-6 sm:text-lg">
+              <p className="mt-4 max-w-xl text-[15px] leading-7 text-white/90 sm:mt-6 sm:text-lg sm:leading-8">
                 {displayCoverageText(settings.hero_subtitle, translate, language)}
               </p>
               {(showPrimaryCta || showSecondaryCta) && (
@@ -636,13 +644,21 @@ function Catalog({
   initialProperties: Property[];
 }) {
   const { language, t } = useLanguage();
+  const translate = useTranslateContent();
   const [type, setType] = useState<string>("Всички");
   const [listing, setListing] = useState<string>("Всички");
   const [city, setCity] = useState<string>("Всички");
   const [district, setDistrict] = useState<string>("Всички");
   const [layout, setLayout] = useState<string>("Всички");
+  const [minPrice, setMinPrice] = useState<string>("");
   const [maxPrice, setMaxPrice] = useState<string>("");
+  const [maxArea, setMaxArea] = useState<string>("");
   const [minArea, setMinArea] = useState<string>("");
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState("recommended");
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [mobileAdvancedOpen, setMobileAdvancedOpen] = useState(false);
   const { properties: list, isLoading } = usePublicProperties(initialProperties);
 
   const districts = useMemo(
@@ -660,19 +676,32 @@ function Catalog({
     [city, list],
   );
   const cities = useMemo(() => listedCities(list), [list]);
+  const minPriceValue = minPrice === "" ? null : Number(minPrice);
   const maxPriceValue = maxPrice === "" ? null : Number(maxPrice);
+  const maxAreaValue = maxArea === "" ? null : Number(maxArea);
   const minAreaValue = minArea === "" ? null : Number(minArea);
 
   const filtered = useMemo(() => {
-    return list.filter((p) => {
+    const normalizedQuery = query.trim().toLocaleLowerCase(language === "en" ? "en" : "bg");
+    const matching = list.filter((p) => {
       if (type !== "Всички" && p.type !== type) return false;
       if (listing !== "Всички" && p.listing !== listing) return false;
       if (city !== "Всички" && p.city !== city) return false;
       if (district !== "Всички" && p.district !== district) return false;
       if (layout !== "Всички" && p.layout !== layout) return false;
       if (
+        minPriceValue !== null &&
+        (p.price <= 0 || !Number.isFinite(p.price) || p.price < minPriceValue)
+      )
+        return false;
+      if (
         maxPriceValue !== null &&
         (p.price <= 0 || !Number.isFinite(p.price) || p.price > maxPriceValue)
+      )
+        return false;
+      if (
+        maxAreaValue !== null &&
+        (p.area <= 0 || !Number.isFinite(p.area) || p.area > maxAreaValue)
       )
         return false;
       if (
@@ -680,9 +709,57 @@ function Catalog({
         (p.area <= 0 || !Number.isFinite(p.area) || p.area < minAreaValue)
       )
         return false;
+      if (normalizedQuery) {
+        const searchableValues = [
+          p.title,
+          p.city,
+          p.district,
+          translate(p.type),
+          p.layout ? translate(p.layout) : "",
+          translate(p.listing),
+          p.description,
+        ].filter(Boolean);
+        if (
+          !searchableValues.some((value) =>
+            value?.toLocaleLowerCase(language === "en" ? "en" : "bg").includes(normalizedQuery),
+          )
+        )
+          return false;
+      }
       return true;
     });
-  }, [list, type, listing, city, district, layout, maxPriceValue, minAreaValue]);
+    const sorted = [...matching];
+    if (sort === "price-asc" || sort === "price-desc") {
+      return sorted.sort((a, b) => {
+        if (a.price <= 0 || !Number.isFinite(a.price)) return 1;
+        if (b.price <= 0 || !Number.isFinite(b.price)) return -1;
+        return sort === "price-asc" ? a.price - b.price : b.price - a.price;
+      });
+    }
+    if (sort === "area-desc") {
+      return sorted.sort((a, b) => {
+        if (a.area <= 0 || !Number.isFinite(a.area)) return 1;
+        if (b.area <= 0 || !Number.isFinite(b.area)) return -1;
+        return b.area - a.area;
+      });
+    }
+    return matching;
+  }, [
+    list,
+    type,
+    listing,
+    city,
+    district,
+    layout,
+    minPriceValue,
+    maxPriceValue,
+    maxAreaValue,
+    minAreaValue,
+    query,
+    sort,
+    language,
+    translate,
+  ]);
 
   const hasActiveFilters =
     type !== "Всички" ||
@@ -690,164 +767,338 @@ function Catalog({
     city !== "Всички" ||
     district !== "Всички" ||
     layout !== "Всички" ||
+    minPrice !== "" ||
     maxPrice !== "" ||
-    minArea !== "";
+    maxArea !== "" ||
+    minArea !== "" ||
+    query !== "" ||
+    sort !== "recommended";
   const clearFilters = () => {
     setType("Всички");
     setListing("Всички");
     setCity("Всички");
     setDistrict("Всички");
     setLayout("Всички");
+    setMinPrice("");
     setMaxPrice("");
+    setMaxArea("");
     setMinArea("");
+    setQuery("");
+    setSort("recommended");
+  };
+  const clearFilter = (key: string) => {
+    if (key === "type") setType("Всички");
+    if (key === "listing") setListing("Всички");
+    if (key === "city") {
+      setCity("Всички");
+      setDistrict("Всички");
+    }
+    if (key === "district") setDistrict("Всички");
+    if (key === "layout") setLayout("Всички");
+    if (key === "minPrice") setMinPrice("");
+    if (key === "maxPrice") setMaxPrice("");
+    if (key === "minArea") setMinArea("");
+    if (key === "maxArea") setMaxArea("");
+    if (key === "query") setQuery("");
+  };
+  const activeFilters = [
+    ...(listing !== "Всички" ? [{ key: "listing", label: translate(listing) }] : []),
+    ...(type !== "Всички" ? [{ key: "type", label: translate(type) }] : []),
+    ...(city !== "Всички" ? [{ key: "city", label: city }] : []),
+    ...(district !== "Всички" ? [{ key: "district", label: district }] : []),
+    ...(layout !== "Всички" ? [{ key: "layout", label: translate(layout) }] : []),
+    ...(minPrice
+      ? [{ key: "minPrice", label: `${t("home.filter.minPriceShort")} ${minPrice} €` }]
+      : []),
+    ...(maxPrice
+      ? [{ key: "maxPrice", label: `${t("home.filter.maxPriceShort")} ${maxPrice} €` }]
+      : []),
+    ...(minArea
+      ? [{ key: "minArea", label: `${t("home.filter.minAreaShort")} ${minArea} м²` }]
+      : []),
+    ...(maxArea
+      ? [{ key: "maxArea", label: `${t("home.filter.maxAreaShort")} ${maxArea} м²` }]
+      : []),
+    ...(query.trim()
+      ? [{ key: "query", label: `${t("home.filter.search")}: ${query.trim()}` }]
+      : []),
+  ];
+  const sharedFilterProps = {
+    listing,
+    setListing,
+    type,
+    setType,
+    city,
+    setCity: (value: string) => {
+      setCity(value);
+      setDistrict("Всички");
+    },
+    cities,
+    district,
+    setDistrict,
+    districts,
+    layout,
+    setLayout,
+    minPrice,
+    setMinPrice,
+    maxPrice,
+    setMaxPrice,
+    minArea,
+    setMinArea,
+    maxArea,
+    setMaxArea,
+    sort,
+    setSort,
+    idPrefix: "mobile",
   };
 
   return (
-    <section id="catalog" className="bg-background py-16 sm:py-20">
+    <section id="catalog" className="bg-background py-10 sm:py-14">
       <div className="mx-auto max-w-6xl px-4 sm:px-5 lg:px-8">
         <SectionEyebrow>{settings.catalog_eyebrow}</SectionEyebrow>
-        <h2 className="mt-4 font-display text-3xl font-medium text-navy sm:text-4xl md:text-5xl">
+        <h2 className="mt-2 font-display text-2xl font-medium text-navy sm:text-3xl md:text-4xl">
           {settings.catalog_title}
         </h2>
 
-        {cities.length > 0 && (
-          <nav
-            aria-label={language === "en" ? "Properties by city" : "Имоти по град"}
-            className="mt-5"
+        <div className="mt-4 rounded-xl border border-border/80 bg-card p-3 shadow-sm sm:mt-5 sm:p-4">
+          <form
+            className="hidden items-end gap-3 lg:grid lg:grid-cols-[minmax(8rem,1.2fr)_minmax(7rem,1fr)_minmax(7rem,1fr)_minmax(8rem,1.1fr)_minmax(10rem,1.4fr)_auto]"
+            onSubmit={(event) => {
+              event.preventDefault();
+              document.getElementById("property-results")?.scrollIntoView({ behavior: "smooth" });
+            }}
           >
-            <h3 className="text-sm font-medium text-muted-foreground">
-              {language === "en" ? "Browse properties by city" : "Разгледайте имотите по град"}
-            </h3>
-            <ul className="mt-2 flex flex-wrap gap-2">
-              {cities.map((listedCity) => (
-                <li key={listedCity}>
-                  <a
-                    href={`/imoti-v/${citySlug(listedCity)}`}
-                    className="inline-flex rounded-full border border-border px-3 py-1.5 text-sm text-navy transition-colors hover:border-gold hover:bg-gold/10"
-                  >
-                    {language === "en" ? `Properties in ${listedCity}` : `Имоти в ${listedCity}`}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        )}
-
-        <div className="mt-8 rounded-2xl border border-border/80 bg-card p-4 shadow-sm sm:mt-10 sm:p-6">
-          <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h3 className="font-display text-xl font-medium text-navy">
-                {t("home.filter.heading")}
-              </h3>
-              <p className="mt-1 text-sm text-muted-foreground">{t("home.filter.caption")}</p>
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="filter-search-desktop" className="text-[11px] text-muted-foreground">
+                {t("home.filter.search")}
+              </Label>
+              <SearchInput
+                id="filter-search-desktop"
+                value={query}
+                onChange={setQuery}
+                placeholder={t("home.filter.searchExample")}
+              />
             </div>
-            {hasActiveFilters && (
-              <Button
-                type="button"
-                variant="ghost"
-                className="min-h-11 rounded-full px-4 text-navy hover:bg-gold/10"
-                onClick={clearFilters}
-              >
-                {t("home.filter.clear")}
-              </Button>
-            )}
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <FilterSelect
-              label={t("home.filter.type")}
-              value={type}
-              onChange={(v) => {
-                setType(v);
-                if (v !== "Апартамент") setLayout("Всички");
-              }}
-              options={PROPERTY_TYPES as string[]}
-            />
-            <FilterSelect
-              label={t("home.filter.listing")}
-              value={listing}
-              onChange={setListing}
-              options={["Всички", "Продажба", "Наем"]}
-            />
-            <FilterSelect
-              label={t("home.filter.city")}
-              value={city}
-              onChange={(value) => {
+            <PropertyFilterFields
+              listing={listing}
+              setListing={setListing}
+              type={type}
+              setType={setType}
+              city={city}
+              setCity={(value) => {
                 setCity(value);
                 setDistrict("Всички");
               }}
-              options={["Всички", ...cities]}
+              cities={cities}
+              district={district}
+              setDistrict={setDistrict}
+              districts={districts}
+              layout={layout}
+              setLayout={setLayout}
+              minPrice={minPrice}
+              setMinPrice={setMinPrice}
+              maxPrice={maxPrice}
+              setMaxPrice={setMaxPrice}
+              minArea={minArea}
+              setMinArea={setMinArea}
+              maxArea={maxArea}
+              setMaxArea={setMaxArea}
+              sort={sort}
+              setSort={setSort}
+              showAdvanced={advancedOpen}
+              showAll={false}
+              primaryOnly
+              idPrefix="desktop"
             />
-            {type === "Апартамент" && (
-              <FilterSelect
-                label={t("home.filter.layout")}
-                value={layout}
-                onChange={setLayout}
-                options={["Всички", ...APARTMENT_LAYOUTS]}
+            <Button
+              type="submit"
+              className="h-10 whitespace-nowrap rounded-lg bg-navy px-4 text-white hover:bg-navy-deep"
+            >
+              <Search className="mr-2 h-4 w-4" aria-hidden="true" />
+              {t("home.filter.apply")}
+            </Button>
+          </form>
+          <div className="lg:hidden">
+            <div className="flex gap-2">
+              <SearchInput
+                id="filter-search-mobile"
+                value={query}
+                onChange={setQuery}
+                placeholder={t("home.filter.searchExample")}
               />
-            )}
-            <FilterSelect
-              label={t("home.filter.district")}
-              value={district}
-              onChange={setDistrict}
-              options={districts}
-            />
-            <div className="flex flex-col gap-1.5">
-              <Label
-                htmlFor="filter-max-price"
-                className="text-xs uppercase tracking-wider text-muted-foreground"
-              >
-                {t("home.filter.price")}
-              </Label>
-              <Input
-                id="filter-max-price"
-                type="number"
-                inputMode="numeric"
-                min="0"
-                step="1"
-                placeholder={t("home.filter.priceExample")}
-                value={maxPrice}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  if (value === "" || (Number.isFinite(Number(value)) && Number(value) >= 0))
-                    setMaxPrice(value);
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 shrink-0 gap-2 rounded-lg border-navy/20 px-3 text-navy"
+                onClick={() => {
+                  setMobileAdvancedOpen(false);
+                  setMobileFiltersOpen(true);
                 }}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label
-                htmlFor="filter-min-area"
-                className="text-xs uppercase tracking-wider text-muted-foreground"
+                aria-label={t("home.filter.open")}
               >
-                {t("home.filter.area")}
-              </Label>
-              <Input
-                id="filter-min-area"
-                type="number"
-                inputMode="numeric"
-                min="0"
-                step="0.1"
-                placeholder={t("home.filter.areaExample")}
-                value={minArea}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  if (value === "" || (Number.isFinite(Number(value)) && Number(value) >= 0))
-                    setMinArea(value);
-                }}
-              />
+                <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+                <span>{t("home.filter.filters")}</span>
+              </Button>
             </div>
+            <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
+              <SheetContent
+                side="bottom"
+                className="flex max-h-[88svh] w-full flex-col gap-0 overflow-hidden rounded-t-2xl px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-5"
+              >
+                <SheetHeader className="shrink-0 pr-10 text-left">
+                  <SheetTitle className="font-display text-xl text-navy">
+                    {t("home.filter.title")}
+                  </SheetTitle>
+                  <SheetDescription>{t("home.filter.mobileDescription")}</SheetDescription>
+                </SheetHeader>
+                <div className="mt-5 min-h-0 flex-1 overflow-y-auto pb-5">
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <PropertyFilterFields {...sharedFilterProps} showAdvanced={false} showAll />
+                    </div>
+                    <button
+                      type="button"
+                      aria-expanded={mobileAdvancedOpen}
+                      onClick={() => setMobileAdvancedOpen((open) => !open)}
+                      className="inline-flex min-h-11 items-center gap-2 rounded-md px-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                    >
+                      <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+                      {t("home.filter.advanced")}
+                    </button>
+                    {mobileAdvancedOpen && (
+                      <div className="grid grid-cols-2 gap-3 border-t border-border/70 pt-3">
+                        <PropertyFilterFields {...sharedFilterProps} showAdvanced showAll={false} />
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex shrink-0 gap-3 border-t border-border bg-background pt-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="min-h-11 flex-1 rounded-lg"
+                    onClick={clearFilters}
+                  >
+                    {t("home.filter.clear")}
+                  </Button>
+                  <Button
+                    type="button"
+                    className="min-h-11 flex-1 rounded-lg bg-navy text-white hover:bg-navy-deep"
+                    onClick={() => setMobileFiltersOpen(false)}
+                  >
+                    {t("home.filter.applyCount").replace("{count}", String(filtered.length))}
+                  </Button>
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
+          <div className="mt-3 hidden lg:block">
+            <div className="flex items-center justify-between gap-3">
+              <button
+                type="button"
+                aria-expanded={advancedOpen}
+                onClick={() => setAdvancedOpen((open) => !open)}
+                className="inline-flex min-h-9 items-center gap-2 rounded-md px-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+              >
+                <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+                {t("home.filter.advanced")}
+                <span className="rounded-full bg-muted px-1.5 text-xs tabular-nums">
+                  {[
+                    district !== "Всички",
+                    layout !== "Всички",
+                    minArea !== "",
+                    maxArea !== "",
+                    sort !== "recommended",
+                  ].filter(Boolean).length || ""}
+                </span>
+              </button>
+              <p
+                id="property-results"
+                className="scroll-mt-24 text-sm text-muted-foreground"
+                aria-live="polite"
+              >
+                {isLoading
+                  ? t("home.filter.loading")
+                  : filtered.length === 1
+                    ? t("home.filter.foundOne")
+                    : t("home.filter.foundMany").replace("{count}", String(filtered.length))}
+              </p>
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  className="min-h-9 rounded-md px-2 text-sm text-muted-foreground underline-offset-4 hover:text-navy hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                  onClick={clearFilters}
+                >
+                  {t("home.filter.clear")}
+                </button>
+              )}
+            </div>
+            {advancedOpen && (
+              <div className="mt-3 grid grid-cols-4 gap-3 border-t border-border/70 pt-3">
+                <PropertyFilterFields
+                  listing={listing}
+                  setListing={setListing}
+                  type={type}
+                  setType={setType}
+                  city={city}
+                  setCity={(value) => {
+                    setCity(value);
+                    setDistrict("Всички");
+                  }}
+                  cities={cities}
+                  district={district}
+                  setDistrict={setDistrict}
+                  districts={districts}
+                  layout={layout}
+                  setLayout={setLayout}
+                  minPrice={minPrice}
+                  setMinPrice={setMinPrice}
+                  maxPrice={maxPrice}
+                  setMaxPrice={setMaxPrice}
+                  minArea={minArea}
+                  setMinArea={setMinArea}
+                  maxArea={maxArea}
+                  setMaxArea={setMaxArea}
+                  sort={sort}
+                  setSort={setSort}
+                  showAdvanced
+                  showAll={false}
+                  idPrefix="advanced"
+                />
+              </div>
+            )}
+          </div>
+          {activeFilters.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2" aria-label={t("home.filter.activeFilters")}>
+              {activeFilters.map(({ key, label }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => clearFilter(key)}
+                  aria-label={`${t("home.filter.remove")} ${label}`}
+                  className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-navy/5 px-3 py-1 text-xs font-medium text-navy transition-colors hover:bg-gold/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                >
+                  {label}
+                  <X className="h-3 w-3" aria-hidden="true" />
+                </button>
+              ))}
+            </div>
+          )}
+          <p
+            id="property-results-mobile"
+            className="mt-3 text-sm text-muted-foreground lg:hidden"
+            aria-live="polite"
+          >
+            {isLoading
+              ? t("home.filter.loading")
+              : filtered.length === 1
+                ? t("home.filter.foundOne")
+                : t("home.filter.foundMany").replace("{count}", String(filtered.length))}
+          </p>
         </div>
 
-        <p className="mt-6 text-sm text-muted-foreground" aria-live="polite">
-          {isLoading
-            ? t("home.filter.loading")
-            : filtered.length === 1
-              ? t("home.filter.foundOne")
-              : t("home.filter.foundMany").replace("{count}", String(filtered.length))}
-        </p>
-
         {isLoading ? (
-          <div className="mt-4 grid gap-5 sm:gap-7 md:grid-cols-2">
+          <div className="mt-5 grid gap-5 sm:gap-6 lg:grid-cols-2 xl:gap-7">
             {Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
@@ -871,15 +1122,234 @@ function Catalog({
           </div>
         )}
         {!isLoading && filtered.length === 0 && (
-          <div className="mt-10 rounded-2xl border border-dashed border-border p-8 text-center sm:p-12">
-            <p className="text-muted-foreground">{t("home.filter.empty")}</p>
+          <div className="mt-8 rounded-xl border border-border bg-muted/35 px-5 py-10 text-center sm:px-8 sm:py-14">
+            <Search className="mx-auto h-6 w-6 text-navy/70" aria-hidden="true" />
+            <h3 className="mt-4 font-display text-2xl font-medium text-navy">
+              {t("home.filter.emptyTitle")}
+            </h3>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
+              {t("home.filter.empty")}
+            </p>
             <Button variant="outline" className="mt-4 min-h-11 rounded-full" onClick={clearFilters}>
               {t("home.filter.clear")}
             </Button>
           </div>
         )}
+        {cities.length > 0 && (
+          <nav
+            aria-label={language === "en" ? "Properties by city" : "Имоти по населено място"}
+            className="mt-10 border-t border-border pt-5"
+          >
+            <h3 className="text-sm font-medium text-muted-foreground">
+              {language === "en"
+                ? "Browse properties by city"
+                : "Разгледайте имотите по населено място"}
+            </h3>
+            <ul className="mt-2 flex flex-wrap gap-2">
+              {cities.map((listedCity) => (
+                <li key={listedCity}>
+                  <a
+                    href={`/imoti-v/${citySlug(listedCity)}`}
+                    className="inline-flex rounded-full border border-border px-3 py-1.5 text-sm text-navy transition-colors hover:border-gold hover:bg-gold/10"
+                  >
+                    {language === "en" ? `Properties in ${listedCity}` : `Имоти в ${listedCity}`}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        )}
       </div>
     </section>
+  );
+}
+
+function SearchInput({
+  id,
+  value,
+  onChange,
+  placeholder,
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <div className="relative min-w-0">
+      <Search
+        className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+        aria-hidden="true"
+      />
+      <Input
+        id={id}
+        type="search"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="h-10 min-w-0 pl-9"
+      />
+    </div>
+  );
+}
+
+type PropertyFilterFieldsProps = {
+  listing: string;
+  setListing: (value: string) => void;
+  type: string;
+  setType: (value: string) => void;
+  city: string;
+  setCity: (value: string) => void;
+  cities: string[];
+  district: string;
+  setDistrict: (value: string) => void;
+  districts: string[];
+  layout: string;
+  setLayout: (value: string) => void;
+  minPrice: string;
+  setMinPrice: (value: string) => void;
+  maxPrice: string;
+  setMaxPrice: (value: string) => void;
+  minArea: string;
+  setMinArea: (value: string) => void;
+  maxArea: string;
+  setMaxArea: (value: string) => void;
+  sort: string;
+  setSort: (value: string) => void;
+  showAdvanced: boolean;
+  showAll: boolean;
+  primaryOnly?: boolean;
+  idPrefix: string;
+};
+
+function PropertyFilterFields(props: PropertyFilterFieldsProps) {
+  const { t } = useLanguage();
+  const setType = (value: string) => {
+    props.setType(value);
+    if (value !== "Апартамент") props.setLayout("Всички");
+  };
+  return (
+    <>
+      {(props.showAll || props.primaryOnly) && (
+        <FilterSelect
+          label={t("home.filter.listing")}
+          value={props.listing}
+          onChange={props.setListing}
+          options={["Всички", "Продажба", "Наем"]}
+        />
+      )}
+      {(props.showAll || props.primaryOnly) && (
+        <FilterSelect
+          label={t("home.filter.type")}
+          value={props.type}
+          onChange={setType}
+          options={PROPERTY_TYPES as string[]}
+        />
+      )}
+      {(props.showAll || props.primaryOnly) && (
+        <FilterSelect
+          label={t("home.filter.city")}
+          value={props.city}
+          onChange={props.setCity}
+          options={["Всички", ...props.cities]}
+        />
+      )}
+      {!props.primaryOnly && props.showAdvanced && (
+        <>
+          <FilterSelect
+            label={t("home.filter.district")}
+            value={props.district}
+            onChange={props.setDistrict}
+            options={props.districts}
+          />
+          {props.type === "Апартамент" && (
+            <FilterSelect
+              label={t("home.filter.layout")}
+              value={props.layout}
+              onChange={props.setLayout}
+              options={["Всички", ...APARTMENT_LAYOUTS]}
+            />
+          )}
+          <NumberField
+            id={`${props.idPrefix}-min-area`}
+            label={t("home.filter.minArea")}
+            value={props.minArea}
+            onChange={props.setMinArea}
+            step="0.1"
+          />
+          <NumberField
+            id={`${props.idPrefix}-max-area`}
+            label={t("home.filter.maxArea")}
+            value={props.maxArea}
+            onChange={props.setMaxArea}
+            step="0.1"
+          />
+          <FilterSelect
+            label={t("home.filter.sort")}
+            value={props.sort}
+            onChange={props.setSort}
+            options={["recommended", "price-asc", "price-desc", "area-desc"]}
+            optionLabels={{
+              recommended: t("home.filter.sortRecommended"),
+              "price-asc": t("home.filter.sortPriceAsc"),
+              "price-desc": t("home.filter.sortPriceDesc"),
+              "area-desc": t("home.filter.sortAreaDesc"),
+            }}
+          />
+        </>
+      )}
+      {(props.showAll || props.primaryOnly) && (
+        <div className="grid min-w-0 grid-cols-2 gap-2">
+          <NumberField
+            id={`${props.idPrefix}-min-price`}
+            label={t("home.filter.minPrice")}
+            value={props.minPrice}
+            onChange={props.setMinPrice}
+          />
+          <NumberField
+            id={`${props.idPrefix}-max-price`}
+            label={t("home.filter.maxPrice")}
+            value={props.maxPrice}
+            onChange={props.setMaxPrice}
+          />
+        </div>
+      )}
+    </>
+  );
+}
+
+function NumberField({
+  id,
+  label,
+  value,
+  onChange,
+  step = "1",
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  step?: string;
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <Label htmlFor={id} className="truncate text-[11px] text-muted-foreground">
+        {label}
+      </Label>
+      <Input
+        id={id}
+        type="number"
+        inputMode="decimal"
+        min="0"
+        step={step}
+        value={value}
+        onChange={(event) => {
+          const next = event.target.value;
+          if (next === "" || (Number.isFinite(Number(next)) && Number(next) >= 0)) onChange(next);
+        }}
+        className="h-10 min-w-0"
+      />
+    </div>
   );
 }
 
@@ -888,27 +1358,29 @@ function FilterSelect({
   value,
   onChange,
   options,
+  optionLabels,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   options: string[];
+  optionLabels?: Record<string, string>;
 }) {
   const id = useId();
   const translate = useTranslateContent();
   return (
     <div className="flex flex-col gap-1.5">
-      <Label htmlFor={id} className="text-xs uppercase tracking-wider text-muted-foreground">
+      <Label htmlFor={id} className="truncate text-[11px] text-muted-foreground">
         {label}
       </Label>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger id={id} aria-label={label}>
+        <SelectTrigger id={id} aria-label={label} className="h-10 px-2 text-sm">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
           {options.map((o) => (
             <SelectItem key={o} value={o}>
-              {translate(o)}
+              {optionLabels?.[o] ?? translate(o)}
             </SelectItem>
           ))}
         </SelectContent>
@@ -926,12 +1398,12 @@ function PropertyCard({ p }: { p: Property }) {
     maximumFractionDigits: 0,
   }).format(p.price);
   return (
-    <article className="property-card group relative flex flex-col overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm">
+    <article className="property-card group relative flex flex-col overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm">
       <Link
         to="/properties/$id"
         params={{ id: p.id }}
         aria-label={`${t("property.more")}: ${p.title}`}
-        className="absolute inset-0 z-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold"
+        className="absolute inset-0 z-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold"
       >
         <span className="sr-only">
           {t("property.more")}: {p.title}
@@ -951,16 +1423,18 @@ function PropertyCard({ p }: { p: Property }) {
         ) : (
           <div className="h-full w-full bg-muted" aria-hidden="true" />
         )}
-        <span className="absolute left-4 top-4 rounded-full bg-navy/95 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-white backdrop-blur">
+        <span className="absolute left-4 top-4 rounded-md bg-navy/95 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wider text-white">
           {translate(p.listing)}
         </span>
-        <span className="absolute right-4 top-4 rounded-full bg-gold px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-navy-deep">
+        <span className="absolute right-4 top-4 rounded-md bg-gold px-3 py-1.5 text-[11px] font-medium uppercase tracking-wider text-navy-deep">
           {translate(p.type)}
         </span>
       </div>
       <div className="pointer-events-none relative z-10 flex flex-1 flex-col p-5 sm:p-6">
         <div className="flex items-baseline justify-between gap-3">
-          <h3 className="font-display text-xl font-medium text-navy">{p.title}</h3>
+          <h3 className="line-clamp-2 font-display text-xl font-medium leading-tight text-navy">
+            {p.title}
+          </h3>
         </div>
         <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
           <MapPin className="h-3.5 w-3.5" /> {p.city}
@@ -978,12 +1452,12 @@ function PropertyCard({ p }: { p: Property }) {
             </span>
           </div>
         )}
-        <div className="mt-5 flex flex-wrap items-end justify-between gap-3">
+        <div className="mt-auto flex flex-wrap items-end justify-between gap-3 pt-5">
           <div>
             <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
               {t("property.price")}
             </div>
-            <div className="font-display text-2xl font-medium tabular-nums text-navy">
+            <div className="font-display text-2xl font-semibold tabular-nums text-navy">
               {p.price > 0 && Number.isFinite(p.price) ? priceText : t("property.priceOnRequest")}
               {p.price > 0 && p.listing === "Наем" && (
                 <span className="text-sm text-muted-foreground"> {t("property.month")}</span>
