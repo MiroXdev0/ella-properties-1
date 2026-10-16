@@ -29,6 +29,12 @@ bun run preview
 
 TanStack Start renders pages on the server and exposes server functions and API routes. The official Cloudflare Vite plugin builds and previews the Worker and its static assets; this is not a static-only site. `bun run preview` runs the production build in Cloudflare's local Worker runtime.
 
+## Installable app
+
+The public site is installable as a PWA from its web app manifest. The root service worker caches only same-origin static assets and the offline fallback; pages, Supabase/API responses, authentication, and admin data are never cached. When offline, navigation shows the bilingual `public/offline.html` fallback. Service-worker updates wait for user confirmation before activation.
+
+On Android and supported desktop browsers, use the footer's **Install the app** link to open the browser's native install prompt. On iPhone and iPad, open the site in Safari and use Share → Add to Home Screen. Installation and service workers require HTTPS in production; `localhost` is allowed for development.
+
 ## Independent Cloudflare deployment
 
 The build uses the project's checked-in Vite, TanStack Start, and Cloudflare Vite plugin configuration in [`vite.config.ts`](./vite.config.ts) and [`wrangler.jsonc`](./wrangler.jsonc). Provide `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in the build environment (for example, in the local `.env` file or CI variables), because Vite embeds them in the client assets. Separately set these runtime bindings in Cloudflare Worker settings:

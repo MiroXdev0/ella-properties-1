@@ -63,6 +63,7 @@ import { broadenLegacyCoverageText, citySlug, listedCities } from "@/lib/cities"
 import { submitInquiry } from "@/lib/inquiries.functions";
 import { ConsentEmbed } from "@/components/consent/ConsentEmbed";
 import { openCookiePreferences } from "@/lib/consent";
+import { PwaInstallLink } from "@/components/pwa/PwaInstallLink";
 import { useLanguage, useTranslateContent } from "@/i18n/LanguageProvider";
 import { LanguageSwitcher } from "@/i18n/LanguageSwitcher";
 import { bg } from "@/i18n/bg";
@@ -2051,7 +2052,13 @@ function Footer({
           <p className="max-w-full text-white/75">
             © 2026 Ella Недвижими Имоти. Всички права запазени.
           </p>
-          <p className="text-gold/75">Built by MiroX</p>
+          <p className="flex max-w-full flex-wrap items-center justify-center gap-x-3 gap-y-1 text-gold/75">
+            <span>Built by MiroX</span>
+            <span aria-hidden="true" className="text-white/35">
+              ·
+            </span>
+            <PwaInstallLink />
+          </p>
         </div>
       </div>
     </footer>

@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="bg">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0B1E3B" />
+    <title>Няма връзка — Елла Недвижими Имоти</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Jost, Arial, sans-serif;
+        background: #f7f6f3;
+        color: #0b1e3b;
+      }
+
+      body {
+        display: grid;
+        min-height: 100vh;
+        margin: 0;
+        place-items: center;
+        padding: 24px;
+        box-sizing: border-box;
+      }
+
+      main {
+        width: min(100%, 32rem);
+        text-align: center;
+      }
+
+      h1 {
+        margin-bottom: 12px;
+        font-family: Georgia, serif;
+        font-size: clamp(2rem, 7vw, 3rem);
+      }
+
+      p {
+        color: #455264;
+        line-height: 1.6;
+      }
+
+      a {
+        display: inline-block;
+        margin-top: 16px;
+        color: #0b1e3b;
+        font-weight: 600;
+        text-decoration-color: #c6a15b;
+        text-underline-offset: 4px;
+      }
+
+      a:focus-visible {
+        outline: 2px solid #c6a15b;
+        outline-offset: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1 data-bg="Няма връзка с интернет" data-en="You're offline">Няма връзка с интернет</h1>
+      <p
+        data-bg="Проверете интернет връзката си и опитайте отново. Запазените ресурси на приложението ще бъдат достъпни след възстановяване на връзката."
+        data-en="Check your internet connection and try again. Cached app resources will be available when your connection returns."
+      >
+        Проверете интернет връзката си и опитайте отново. Запазените ресурси на приложението ще
+        бъдат достъпни след възстановяване на връзката.
+      </p>
+      <a href="/" data-bg="Към началната страница" data-en="Go to homepage">
+        Към началната страница
+      </a>
+    </main>
+    <script>
+      const savedLanguage = localStorage.getItem("ella-language");
+      const language =
+        savedLanguage === "en" || savedLanguage === "bg"
+          ? savedLanguage
+          : navigator.language.toLowerCase().startsWith("en")
+            ? "en"
+            : "bg";
+      document.documentElement.lang = language;
+      document.querySelectorAll("[data-bg][data-en]").forEach((element) => {
+        element.textContent = element.dataset[language];
+      });
+    </script>
+  </body>
+</html>

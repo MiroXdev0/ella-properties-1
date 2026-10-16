@@ -208,6 +208,21 @@ export const en: Record<keyof typeof bg, string> = {
   "footer.terms": "Terms",
   "footer.dataRights": "Data rights",
   "footer.cookieSettings": "Cookie settings",
+  "footer.installApp": "Install the app",
+  "pwa.installTitle": "Install Ella Real Estate",
+  "pwa.alreadyInstalled": "The app is already installed on this device.",
+  "pwa.iosInstructions":
+    "Open this site in Safari, tap Share, choose Add to Home Screen, then tap Add to confirm.",
+  "pwa.manualInstructions":
+    "In Chrome, open the ⋮ menu and choose Install app or Add to Home screen.",
+  "pwa.unavailable":
+    "Installation is not supported in this browser. Open the site in an up-to-date Chrome, Edge, or Safari and use its menu to add it to your home screen.",
+  "pwa.installAccepted":
+    "The installation request was accepted. Follow your browser's instructions.",
+  "pwa.installDismissed": "Installation was cancelled. You can try again from your browser menu.",
+  "pwa.updateAvailable": "A new version of the app is available.",
+  "pwa.updateNow": "Update now",
+  "pwa.dismissUpdate": "Dismiss update notice",
   "auth.adminPanel": "Admin Panel",
   "auth.loginTitle": "Sign in",
   "auth.signupTitle": "Create an account",

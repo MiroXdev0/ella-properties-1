@@ -12,6 +12,7 @@ import type { ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { ConsentBanner } from "@/components/consent/ConsentBanner";
 import { LanguageProvider } from "@/i18n/LanguageProvider";
+import { PwaManager } from "@/components/pwa/PwaManager";
 
 function NotFoundComponent() {
   return (
@@ -108,7 +109,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       {
         rel: "manifest",
-        href: "/manifest.webmanifest?v=20261016-icons",
+        href: "/manifest.webmanifest?v=20261016-pwa",
+      },
+      {
+        rel: "apple-touch-icon",
+        href: "/logo-mobile-maskable-192.png",
       },
     ],
   }),
@@ -138,9 +143,11 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <LanguageProvider>
-        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-        <Outlet />
-        <ConsentBanner />
+        <PwaManager>
+          {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+          <Outlet />
+          <ConsentBanner />
+        </PwaManager>
       </LanguageProvider>
     </QueryClientProvider>
   );
