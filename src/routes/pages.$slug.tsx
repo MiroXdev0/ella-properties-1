@@ -3,7 +3,7 @@ import { createFileRoute, notFound } from "@tanstack/react-router";
 import { ContentPageView } from "@/components/cms/ContentPageView";
 import { supabase } from "@/integrations/supabase/client";
 import { readPageContent } from "@/lib/site-pages";
-import { SITE_URL } from "@/lib/seo";
+import { breadcrumbJsonLd, jsonLdScript, limitMetaText, SITE_URL } from "@/lib/seo";
 
 export const Route = createFileRoute("/pages/$slug")({
   loader: async ({ params }) => {
@@ -35,27 +35,40 @@ export const Route = createFileRoute("/pages/$slug")({
     }
 
     const localized = loaderData.content.bg;
-    const title = (localized.seoTitle || loaderData.seo_title || localized.title)
-      .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, 60);
-    const description = (
-      localized.seoDescription ||
-      loaderData.seo_description ||
-      localized.body
-    ).replace(/\s+/g, " ").trim().slice(0, 158);
+    const rawTitle = localized.seoTitle || loaderData.seo_title || localized.title;
+    const title = limitMetaText(
+      rawTitle.includes("Елла Недвижими Имоти") ? rawTitle : `${rawTitle} | Елла Недвижими Имоти`,
+      65,
+    );
+    const description = limitMetaText(
+      localized.seoDescription || loaderData.seo_description || localized.body || localized.title,
+      158,
+    );
     const canonical = `${SITE_URL}/pages/${encodeURIComponent(params.slug)}`;
 
     return {
       meta: [
-        { title: `${title} | Елла Недвижими Имоти` },
-        ...(description ? [{ name: "description", content: description }] : []),
+        { title },
+        { name: "description", content: description },
         { property: "og:title", content: title },
-        ...(description ? [{ property: "og:description", content: description }] : []),
+        { property: "og:description", content: description },
         { property: "og:type", content: "article" },
         { property: "og:url", content: canonical },
+        { property: "og:site_name", content: "Елла Недвижими Имоти" },
+        { property: "og:locale", content: "bg_BG" },
+        { name: "twitter:card", content: "summary" },
+        { name: "twitter:title", content: title },
+        { name: "twitter:description", content: description },
       ],
       links: [{ rel: "canonical", href: canonical }],
+      scripts: [
+        jsonLdScript(
+          breadcrumbJsonLd([
+            { name: "Начало", url: `${SITE_URL}/` },
+            { name: localized.title, url: canonical },
+          ]),
+        ),
+      ],
     };
   },
   component: PageRoute,

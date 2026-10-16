@@ -22,7 +22,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSiteSettings } from "@/hooks/use-site-settings";
 import { isVideoUrl, embedUrl } from "@/lib/media";
 import { ConsentEmbed } from "@/components/consent/ConsentEmbed";
-import { SITE_URL } from "@/lib/seo";
+import { breadcrumbJsonLd, jsonLdScript, limitMetaText, SITE_URL } from "@/lib/seo";
+import { citySlug } from "@/lib/cities";
 import { useLanguage, useTranslateContent } from "@/i18n/LanguageProvider";
 import { LanguageSwitcher } from "@/i18n/LanguageSwitcher";
 import { ShareProperty } from "@/components/property/ShareProperty";
@@ -67,6 +68,7 @@ async function loadProperty(id: string): Promise<Detail> {
     )
     .eq("id", id)
     .eq("is_published", true)
+    .in("status", ["Продава", "Под наем"])
     .maybeSingle();
   if (error) throw error;
   if (!data) throw notFound();
@@ -119,18 +121,91 @@ export const Route = createFileRoute("/properties/$id")({
     const url = `${SITE_URL}/properties/${encodeURIComponent(params.id)}`;
     const image = loaderData.media.find((item) => item.kind === "image")?.url ?? heroImage;
     const imageUrl = new URL(image, SITE_URL).href;
-    const title = (loaderData.seoTitle || `${loaderData.title} — ${loaderData.city}`)
-      .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, 60);
-    const desc = (
-      loaderData.seoDescription ||
-      loaderData.description ||
-      `${loaderData.type} в ${loaderData.city}, ${loaderData.district}. ${loaderData.area} м².`
-    )
-      .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, 158);
+    const listingPhrase = loaderData.listing === "Наем" ? "под наем" : "за продажба";
+    const location = [loaderData.city, loaderData.district].filter(Boolean).join(", ");
+    const generatedTitle = `${loaderData.type} ${listingPhrase} в ${location} | Елла Имоти`;
+    const title = limitMetaText(loaderData.seoTitle?.trim() || generatedTitle, 65);
+    const priceText =
+      loaderData.price > 0 && Number.isFinite(loaderData.price)
+        ? new Intl.NumberFormat("bg-BG", {
+            style: "currency",
+            currency: "EUR",
+            maximumFractionDigits: 0,
+          }).format(loaderData.price)
+        : "";
+    const facts = [
+      `${loaderData.type} ${listingPhrase} в ${location}.`,
+      priceText ? `Цена: ${priceText}${loaderData.listing === "Наем" ? " месечно" : ""}.` : "",
+      loaderData.area > 0 && Number.isFinite(loaderData.area) ? `Площ: ${loaderData.area} м².` : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    const desc = limitMetaText(
+      loaderData.seoDescription?.trim() ||
+        [facts, loaderData.description.replace(/\s+/g, " ").trim()].filter(Boolean).join(" "),
+      158,
+    );
+    const mainEntityType =
+      loaderData.type === "Къща"
+        ? "House"
+        : loaderData.type === "Апартамент"
+          ? "Apartment"
+          : "Place";
+    const mainEntity = {
+      "@type": mainEntityType,
+      name: loaderData.title,
+      ...(location
+        ? {
+            address: {
+              "@type": "PostalAddress",
+              ...(loaderData.address ? { streetAddress: loaderData.address } : {}),
+              addressLocality: loaderData.city,
+              addressCountry: "BG",
+            },
+          }
+        : {}),
+      ...(["Къща", "Апартамент"].includes(loaderData.type) &&
+      loaderData.area > 0 &&
+      Number.isFinite(loaderData.area)
+        ? {
+            floorSize: {
+              "@type": "QuantitativeValue",
+              value: loaderData.area,
+              unitCode: "MTK",
+            },
+          }
+        : {}),
+      ...(loaderData.rooms && loaderData.rooms > 0 ? { numberOfRooms: loaderData.rooms } : {}),
+      ...(loaderData.yardArea && loaderData.yardArea > 0
+        ? {
+            additionalProperty: {
+              "@type": "PropertyValue",
+              name: "Площ на двора",
+              value: loaderData.yardArea,
+              unitText: "m²",
+            },
+          }
+        : {}),
+    };
+    const offer =
+      loaderData.price > 0 && Number.isFinite(loaderData.price)
+        ? {
+            "@type": "Offer",
+            price: loaderData.price,
+            priceCurrency: "EUR",
+            availability: "https://schema.org/InStock",
+            ...(loaderData.listing === "Наем"
+              ? {
+                  priceSpecification: {
+                    "@type": "UnitPriceSpecification",
+                    price: loaderData.price,
+                    priceCurrency: "EUR",
+                    unitText: "month",
+                  },
+                }
+              : {}),
+          }
+        : null;
     return {
       meta: [
         { title },
@@ -140,6 +215,7 @@ export const Route = createFileRoute("/properties/$id")({
         { property: "og:type", content: "article" },
         { property: "og:url", content: url },
         { property: "og:site_name", content: "Елла Недвижими Имоти" },
+        { property: "og:locale", content: "bg_BG" },
         { property: "og:image", content: imageUrl },
         { property: "og:image:alt", content: title },
         { name: "twitter:title", content: title },
@@ -150,42 +226,26 @@ export const Route = createFileRoute("/properties/$id")({
       ],
       links: [{ rel: "canonical", href: url }],
       scripts: [
-        {
-          type: "application/ld+json",
-          children: JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "RealEstateListing",
-            name: loaderData.title,
-            description: desc,
-            url,
-            ...(imageUrl ? { image: imageUrl } : {}),
-            ...(loaderData.area > 0
-              ? {
-                  floorSize: {
-                    "@type": "QuantitativeValue",
-                    value: loaderData.area,
-                    unitCode: "MTK",
-                  },
-                }
-              : {}),
-            ...(loaderData.price > 0
-              ? {
-                  offers: {
-                    "@type": "Offer",
-                    price: loaderData.price,
-                    priceCurrency: "EUR",
-                    availability: "https://schema.org/InStock",
-                  },
-                }
-              : {}),
-            address: {
-              "@type": "PostalAddress",
-              addressLocality: loaderData.city,
-              addressRegion: loaderData.district,
-              addressCountry: "BG",
+        jsonLdScript({
+          "@context": "https://schema.org",
+          "@type": "RealEstateListing",
+          name: loaderData.title,
+          description: desc,
+          url,
+          image: imageUrl,
+          mainEntity,
+          ...(offer ? { offers: offer } : {}),
+        }),
+        jsonLdScript(
+          breadcrumbJsonLd([
+            { name: "Начало", url: `${SITE_URL}/` },
+            {
+              name: `Имоти в ${loaderData.city}`,
+              url: `${SITE_URL}/imoti-v/${encodeURIComponent(citySlug(loaderData.city))}`,
             },
-          }),
-        },
+            { name: loaderData.title, url },
+          ]),
+        ),
       ],
     };
   },

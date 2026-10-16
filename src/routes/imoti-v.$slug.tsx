@@ -4,7 +4,7 @@ import { LanguageSwitcher } from "@/i18n/LanguageSwitcher";
 import { useLanguage, useTranslateContent } from "@/i18n/LanguageProvider";
 import { fetchPublicProperties } from "@/hooks/use-public-properties";
 import { citySeoDescription, citySeoTitle, citySlug } from "@/lib/cities";
-import { SITE_URL } from "@/lib/seo";
+import { breadcrumbJsonLd, jsonLdScript, SITE_URL } from "@/lib/seo";
 
 export const Route = createFileRoute("/imoti-v/$slug")({
   loader: async ({ params }) => {
@@ -28,21 +28,39 @@ export const Route = createFileRoute("/imoti-v/$slug")({
     }
 
     const url = `${SITE_URL}/imoti-v/${encodeURIComponent(params.slug)}`;
-    const title = citySeoTitle(loaderData.city);
-    const description = citySeoDescription(loaderData.city, loaderData.properties.length);
+    const title = citySeoTitle(loaderData.city, loaderData.properties);
+    const description = citySeoDescription(loaderData.city, loaderData.properties);
+    const image = loaderData.properties.find((property) => property.image)?.image;
 
     return {
       meta: [
         { title },
         { name: "description", content: description },
+        { property: "og:locale", content: "bg_BG" },
         { property: "og:title", content: title },
         { property: "og:description", content: description },
         { property: "og:type", content: "website" },
         { property: "og:url", content: url },
         { property: "og:site_name", content: "Елла Недвижими Имоти" },
-        { name: "twitter:card", content: "summary" },
+        ...(image
+          ? [
+              { property: "og:image", content: new URL(image, SITE_URL).href },
+              { name: "twitter:image", content: new URL(image, SITE_URL).href },
+            ]
+          : []),
+        { name: "twitter:card", content: image ? "summary_large_image" : "summary" },
+        { name: "twitter:title", content: title },
+        { name: "twitter:description", content: description },
       ],
       links: [{ rel: "canonical", href: url }],
+      scripts: [
+        jsonLdScript(
+          breadcrumbJsonLd([
+            { name: "Начало", url: `${SITE_URL}/` },
+            { name: `Имоти в ${loaderData.city}`, url },
+          ]),
+        ),
+      ],
     };
   },
   notFoundComponent: () => (
@@ -60,6 +78,19 @@ function CityPropertiesPage() {
   const { city, properties } = Route.useLoaderData();
   const { language } = useLanguage();
   const translate = useTranslateContent();
+  const listings = new Set(properties.map((property) => property.listing));
+  const transactionLabel =
+    language === "en"
+      ? listings.size > 1
+        ? "for sale and rent"
+        : listings.has("Наем")
+          ? "for rent"
+          : "for sale"
+      : listings.size > 1
+        ? "за продажба и наем"
+        : listings.has("Наем")
+          ? "под наем"
+          : "за продажба";
   const countLabel =
     language === "en"
       ? `${properties.length} ${properties.length === 1 ? "listing" : "listings"}`
@@ -83,13 +114,16 @@ function CityPropertiesPage() {
           </h1>
           <p className="mt-3 max-w-2xl text-muted-foreground">
             {language === "en"
-              ? `Browse current properties for sale and rent in ${city}.`
-              : `Разгледайте актуалните обяви за продажба и наем на имоти в ${city}.`}
+              ? `Browse current properties ${transactionLabel} in ${city}.`
+              : `Разгледайте актуалните обяви ${transactionLabel} на имоти в ${city}.`}
           </p>
           <p className="mt-2 text-sm text-muted-foreground">{countLabel}</p>
         </header>
 
-        <section aria-label={language === "en" ? `Listings in ${city}` : `Обяви в ${city}`} className="py-8">
+        <section
+          aria-label={language === "en" ? `Listings in ${city}` : `Обяви в ${city}`}
+          className="py-8"
+        >
           <h2 className="sr-only">
             {language === "en" ? `Current properties in ${city}` : `Актуални имоти в ${city}`}
           </h2>
@@ -103,7 +137,7 @@ function CityPropertiesPage() {
                   {property.image ? (
                     <img
                       src={property.image}
-                      alt={`${property.title} в ${city}`}
+                      alt={property.title}
                       width={1024}
                       height={768}
                       loading="lazy"
@@ -116,13 +150,17 @@ function CityPropertiesPage() {
                   <div className="p-5">
                     <h3 className="font-display text-xl font-medium text-navy">{property.title}</h3>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      {city}{property.district ? `, ${property.district}` : ""}
+                      {city}
+                      {property.district ? `, ${property.district}` : ""}
                     </p>
                     <p className="mt-3 line-clamp-3 text-sm text-foreground/75">
                       {translate(property.description)}
                     </p>
                     <p className="mt-4 font-medium text-navy">
-                      € {new Intl.NumberFormat(language === "en" ? "en-GB" : "bg-BG").format(property.price)}
+                      €{" "}
+                      {new Intl.NumberFormat(language === "en" ? "en-GB" : "bg-BG").format(
+                        property.price,
+                      )}
                     </p>
                   </div>
                 </a>

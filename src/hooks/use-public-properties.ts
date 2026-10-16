@@ -24,6 +24,7 @@ export async function fetchPublicProperties(): Promise<Property[]> {
       "id,title,type,layout,status,price,city,district,area,description,main_image,is_featured,created_at",
     )
     .eq("is_published", true)
+    .in("status", ["Продава", "Под наем"])
     .order("is_featured", { ascending: false })
     .order("created_at", { ascending: false });
   if (error) throw error;

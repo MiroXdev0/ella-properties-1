@@ -1,4 +1,5 @@
 import type { Property } from "@/data/properties";
+import { limitMetaText } from "@/lib/seo";
 
 const CYRILLIC_TO_LATIN: Record<string, string> = {
   а: "a",
@@ -44,17 +45,36 @@ export function citySlug(city: string): string {
 }
 
 export function listedCities(properties: Property[]): string[] {
-  return [...new Set(properties.map((property) => property.city.trim()).filter(Boolean))]
-    .sort((a, b) => a.localeCompare(b, "bg"));
+  return [...new Set(properties.map((property) => property.city.trim()).filter(Boolean))].sort(
+    (a, b) => a.localeCompare(b, "bg"),
+  );
 }
 
-export function citySeoTitle(city: string): string {
-  return `Имоти в ${city} | Продажба и наем — Елла Недвижими Имоти`;
+export function citySeoTitle(city: string, properties: Property[]): string {
+  const transactions = new Set(properties.map((property) => property.listing));
+  const transactionLabel =
+    transactions.size > 1
+      ? "за продажба и под наем"
+      : transactions.has("Наем")
+        ? "под наем"
+        : "за продажба";
+  return limitMetaText(`Имоти ${transactionLabel} в ${city} | Елла Недвижими Имоти`, 65);
 }
 
-export function citySeoDescription(city: string, count: number): string {
+export function citySeoDescription(city: string, properties: Property[]): string {
+  const count = properties.length;
   const noun = count === 1 ? "актуална обява" : "актуални обяви";
-  return `Разгледайте ${noun} за имоти в ${city}: цени, площи и подробности за всяка оферта. Свържете се с Елла Недвижими Имоти за съдействие.`;
+  const transactions = new Set(properties.map((property) => property.listing));
+  const transactionLabel =
+    transactions.size > 1
+      ? "за продажба и под наем"
+      : transactions.has("Наем")
+        ? "под наем"
+        : "за продажба";
+  return limitMetaText(
+    `Разгледайте ${count} ${noun} ${transactionLabel} в ${city}. Вижте цени, площи и подробности за актуалните оферти от Елла Недвижими Имоти.`,
+    158,
+  );
 }
 
 export function broadenLegacyCoverageText(text: string, language: "bg" | "en"): string {

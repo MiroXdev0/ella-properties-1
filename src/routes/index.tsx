@@ -57,7 +57,7 @@ import heroImageMobile from "@/assets/hero-960.webp";
 import { type Property, type PropertyType, APARTMENT_LAYOUTS } from "@/data/properties";
 import { fetchPublicProperties, usePublicProperties } from "@/hooks/use-public-properties";
 import { useServerFn } from "@tanstack/react-start";
-import { SITE_URL } from "@/lib/seo";
+import { jsonLdScript, limitMetaText, SITE_URL } from "@/lib/seo";
 import { broadenLegacyCoverageText, citySlug, listedCities } from "@/lib/cities";
 
 import { submitInquiry } from "@/lib/inquiries.functions";
@@ -99,6 +99,9 @@ const iconOf = (name: string) => ICONS[name] ?? HomeIcon;
 const telHref = (n?: string) => `tel:${(n ?? "").replace(/\s+/g, "")}`;
 const waHref = (n?: string) => `https://wa.me/${(n ?? "").replace(/[^0-9]/g, "")}`;
 const viberHref = (n?: string) => `viber://chat?number=%2B${(n ?? "").replace(/[^0-9]/g, "")}`;
+const LEGACY_DEFAULT_HOME_SEO_TITLE = "Елла Недвижими Имоти — актуални обяви за имоти";
+const LEGACY_DEFAULT_HOME_SEO_DESCRIPTION =
+  "Информация за имоти, услуги и контакти на Елла Недвижими Имоти. Съдействие при покупка, продажба и отдаване под наем.";
 const displayBrandName = (name?: string | null) =>
   (name?.trim() || "Елла Недвижими Имоти").replace(/Елла(?=Недвижими)/u, "Елла ");
 const displayCoverageText = (
@@ -128,7 +131,16 @@ export const Route = createFileRoute("/")({
     const settings = loaderData?.settings ?? DEFAULT_SETTINGS;
     const shareImage = new URL(publicLogoUrl(settings.og_image_url) ?? heroImage, SITE_URL).href;
     const cities = listedCities(loaderData?.properties ?? []);
-    const locationLabel = cities.join(", ");
+    const priorityCities = ["Перник", "София"].filter((city) =>
+      cities.some(
+        (listedCity) =>
+          listedCity
+            .trim()
+            .replace(/^гр\.?\s*/iu, "")
+            .localeCompare(city, "bg", { sensitivity: "base" }) === 0,
+      ),
+    );
+    const locationLabel = priorityCities.length > 0 ? priorityCities.join(" и ") : "";
     const configuredTitle = broadenLegacyCoverageText(
       settings.seo_home_title || DEFAULT_SETTINGS.seo_home_title,
       "bg",
@@ -137,14 +149,30 @@ export const Route = createFileRoute("/")({
       settings.seo_home_description || DEFAULT_SETTINGS.seo_home_description,
       "bg",
     );
-    const title = cities.length
-      ? settings.seo_home_title === DEFAULT_SETTINGS.seo_home_title
-        ? `Имоти в ${locationLabel} | Елла Недвижими Имоти`
-        : `${configuredTitle} — имоти в ${locationLabel}`
-      : configuredTitle;
-    const description = cities.length
-      ? `${configuredDescription} Актуални оферти за имоти в ${locationLabel}.`
-      : configuredDescription;
+    const isDefaultTitle = [
+      DEFAULT_SETTINGS.seo_home_title,
+      LEGACY_DEFAULT_HOME_SEO_TITLE,
+    ].includes(settings.seo_home_title);
+    const isDefaultDescription = [
+      DEFAULT_SETTINGS.seo_home_description,
+      LEGACY_DEFAULT_HOME_SEO_DESCRIPTION,
+    ].includes(settings.seo_home_description);
+    const title = limitMetaText(
+      isDefaultTitle
+        ? locationLabel
+          ? `Недвижими имоти в ${locationLabel} | Елла Недвижими Имоти`
+          : "Недвижими имоти | Елла Недвижими Имоти"
+        : configuredTitle,
+      65,
+    );
+    const description = limitMetaText(
+      isDefaultDescription
+        ? locationLabel
+          ? `Актуални обяви за покупка, продажба и наем на имоти в ${locationLabel}. Разгледайте реални оферти и се свържете с Елла Недвижими Имоти.`
+          : "Актуални обяви за покупка, продажба и наем на имоти в населените места с публикувани оферти. Свържете се с Елла Недвижими Имоти."
+        : configuredDescription,
+      158,
+    );
     const shareImageAlt = "Елла Недвижими Имоти — недвижими имоти";
     return {
       meta: [
@@ -155,7 +183,10 @@ export const Route = createFileRoute("/")({
         },
         { property: "og:title", content: title },
         { property: "og:description", content: description },
+        { property: "og:type", content: "website" },
         { property: "og:url", content: `${SITE_URL}/` },
+        { property: "og:site_name", content: "Елла Недвижими Имоти" },
+        { property: "og:locale", content: "bg_BG" },
         { property: "og:image", content: shareImage },
         { property: "og:image:alt", content: shareImageAlt },
         { name: "twitter:card", content: "summary_large_image" },
@@ -166,38 +197,36 @@ export const Route = createFileRoute("/")({
       ],
       links: [{ rel: "canonical", href: `${SITE_URL}/` }],
       scripts: [
-        {
-          type: "application/ld+json",
-          children: JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "RealEstateAgent",
-            name: settings.brand_name,
-            url: `${SITE_URL}/`,
-            ...(cities.length
-              ? { areaServed: cities.map((city) => ({ "@type": "City", name: city })) }
-              : {}),
-            telephone: [settings.phone1, settings.phone2].filter(Boolean),
-            image: new URL(heroImage, SITE_URL).href,
-            ...(settings.address
-              ? {
-                  address: {
-                    "@type": "PostalAddress",
-                    streetAddress: settings.address,
-                    addressCountry: "BG",
-                  },
-                }
-              : {}),
-          }),
-        },
-        {
-          type: "application/ld+json",
-          children: JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "WebSite",
-            name: settings.brand_name,
-            url: `${SITE_URL}/`,
-          }),
-        },
+        jsonLdScript({
+          "@context": "https://schema.org",
+          "@type": "RealEstateAgent",
+          "@id": `${SITE_URL}/#agency`,
+          name: settings.brand_name,
+          url: `${SITE_URL}/`,
+          image: new URL(heroImage, SITE_URL).href,
+          ...(cities.length
+            ? { areaServed: cities.map((city) => ({ "@type": "City", name: city })) }
+            : {}),
+          ...(settings.phone1 || settings.phone2
+            ? { telephone: [settings.phone1, settings.phone2].filter(Boolean) }
+            : {}),
+          ...(settings.address
+            ? {
+                address: {
+                  "@type": "PostalAddress",
+                  streetAddress: settings.address,
+                  addressCountry: "BG",
+                },
+              }
+            : {}),
+        }),
+        jsonLdScript({
+          "@context": "https://schema.org",
+          "@type": "WebSite",
+          name: settings.brand_name,
+          url: `${SITE_URL}/`,
+          inLanguage: "bg",
+        }),
       ],
     };
   },
@@ -1900,10 +1929,6 @@ function Footer({
   );
   const logoUrl = publicLogoUrl(settings.logo_url) ?? "/logo-in-site.png";
   const brandName = displayBrandName(settings.brand_name);
-  const copyright = (settings.footer_copyright || "").replace(
-    "{year}",
-    String(new Date().getFullYear()),
-  );
   return (
     <footer className="border-t border-border bg-navy-deep text-white/80">
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:grid-cols-2 sm:px-5 sm:py-14 lg:px-8">
@@ -2022,9 +2047,12 @@ function Footer({
             {t("footer.cookieSettings")}
           </button>
         </nav>
-        <p className="mx-auto max-w-[15rem] text-center text-xs leading-relaxed text-white/70 sm:max-w-md">
-          {copyright}
-        </p>
+        <div className="mx-auto flex max-w-full flex-col items-center gap-1 text-center text-xs leading-relaxed">
+          <p className="max-w-full text-white/75">
+            © 2026 Ella Недвижими Имоти. Всички права запазени.
+          </p>
+          <p className="text-gold/75">Built by MiroX</p>
+        </div>
       </div>
     </footer>
   );

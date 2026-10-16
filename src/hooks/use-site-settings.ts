@@ -170,9 +170,9 @@ export const DEFAULT_SETTINGS = {
   contact_map_url: "https://maps.app.goo.gl/gWxiPmH7sDt9MtwBA",
   footer_description: "Актуални обяви за имоти и информация за услугите на Елла Недвижими Имоти.",
   footer_copyright: "© {year} Елла Недвижими Имоти. Всички права запазени.",
-  seo_home_title: "Елла Недвижими Имоти — актуални обяви за имоти",
+  seo_home_title: "Недвижими имоти | Елла Недвижими Имоти",
   seo_home_description:
-    "Информация за имоти, услуги и контакти на Елла Недвижими Имоти. Съдействие при покупка, продажба и отдаване под наем.",
+    "Актуални обяви за имоти и съдействие при покупка, продажба и наем в населените места с публикувани оферти.",
 };
 
 export type PublicSettings = typeof DEFAULT_SETTINGS;

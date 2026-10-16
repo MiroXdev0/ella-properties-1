@@ -22,6 +22,7 @@ async function publishedPropertyEntries(): Promise<SitemapEntry[]> {
       .from("properties")
       .select("id,city,updated_at")
       .eq("is_published", true)
+      .in("status", ["Продава", "Под наем"])
       .order("created_at", { ascending: false })
       .range(offset, offset + PAGE_SIZE - 1);
 
@@ -32,7 +33,9 @@ async function publishedPropertyEntries(): Promise<SitemapEntry[]> {
       const date = property.updated_at ? new Date(property.updated_at) : null;
       entries.push({
         path: `/properties/${encodeURIComponent(property.id)}`,
-        ...(date && !Number.isNaN(date.valueOf()) ? { lastmod: date.toISOString().slice(0, 10) } : {}),
+        ...(date && !Number.isNaN(date.valueOf())
+          ? { lastmod: date.toISOString().slice(0, 10) }
+          : {}),
       });
       const city = property.city?.trim();
       const slug = city ? citySlug(city) : "";
@@ -65,7 +68,9 @@ async function publishedPageEntries(): Promise<SitemapEntry[]> {
       const date = page.updated_at ? new Date(page.updated_at) : null;
       entries.push({
         path: `/pages/${encodeURIComponent(page.slug)}`,
-        ...(date && !Number.isNaN(date.valueOf()) ? { lastmod: date.toISOString().slice(0, 10) } : {}),
+        ...(date && !Number.isNaN(date.valueOf())
+          ? { lastmod: date.toISOString().slice(0, 10) }
+          : {}),
       });
     }
 
