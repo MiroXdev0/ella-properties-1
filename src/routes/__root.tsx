@@ -108,7 +108,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       {
         rel: "manifest",
-        href: "/manifest.webmanifest?v=20261015-icons",
+        href: "/manifest.webmanifest?v=20261016-icons",
       },
     ],
   }),

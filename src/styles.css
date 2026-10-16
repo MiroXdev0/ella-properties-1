@@ -154,6 +154,11 @@
 }
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 5.5rem;
+  }
+
   * {
     border-color: var(--color-border);
   }
@@ -174,6 +179,10 @@
 
   p {
     text-wrap: pretty;
+  }
+
+  section[id] {
+    scroll-margin-top: 5.5rem;
   }
 
   ::selection {

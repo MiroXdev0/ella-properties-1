@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import {
   Phone,
   MapPin,
@@ -646,10 +646,22 @@ function Catalog({
   const { properties: list, isLoading } = usePublicProperties(initialProperties);
 
   const districts = useMemo(
-    () => ["Всички", ...Array.from(new Set(list.map((p) => p.district).filter(Boolean)))],
-    [list],
+    () => [
+      "Всички",
+      ...Array.from(
+        new Set(
+          list
+            .filter((property) => city === "Всички" || property.city === city)
+            .map((property) => property.district)
+            .filter(Boolean),
+        ),
+      ),
+    ],
+    [city, list],
   );
   const cities = useMemo(() => listedCities(list), [list]);
+  const maxPriceValue = maxPrice === "" ? null : Number(maxPrice);
+  const minAreaValue = minArea === "" ? null : Number(minArea);
 
   const filtered = useMemo(() => {
     return list.filter((p) => {
@@ -658,11 +670,37 @@ function Catalog({
       if (city !== "Всички" && p.city !== city) return false;
       if (district !== "Всички" && p.district !== district) return false;
       if (layout !== "Всички" && p.layout !== layout) return false;
-      if (maxPrice && p.price > Number(maxPrice)) return false;
-      if (minArea && p.area < Number(minArea)) return false;
+      if (
+        maxPriceValue !== null &&
+        (p.price <= 0 || !Number.isFinite(p.price) || p.price > maxPriceValue)
+      )
+        return false;
+      if (
+        minAreaValue !== null &&
+        (p.area <= 0 || !Number.isFinite(p.area) || p.area < minAreaValue)
+      )
+        return false;
       return true;
     });
-  }, [list, type, listing, city, district, layout, maxPrice, minArea]);
+  }, [list, type, listing, city, district, layout, maxPriceValue, minAreaValue]);
+
+  const hasActiveFilters =
+    type !== "Всички" ||
+    listing !== "Всички" ||
+    city !== "Всички" ||
+    district !== "Всички" ||
+    layout !== "Всички" ||
+    maxPrice !== "" ||
+    minArea !== "";
+  const clearFilters = () => {
+    setType("Всички");
+    setListing("Всички");
+    setCity("Всички");
+    setDistrict("Всички");
+    setLayout("Всички");
+    setMaxPrice("");
+    setMinArea("");
+  };
 
   return (
     <section id="catalog" className="bg-background py-16 sm:py-20">
@@ -695,73 +733,108 @@ function Catalog({
           </nav>
         )}
 
-        <div className="mt-8 grid gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm sm:mt-10 sm:grid-cols-2 sm:p-5">
-          <FilterSelect
-            label={t("home.filter.type")}
-            value={type}
-            onChange={(v) => {
-              setType(v);
-              if (v !== "Апартамент") setLayout("Всички");
-            }}
-            options={PROPERTY_TYPES as string[]}
-          />
-          <FilterSelect
-            label={t("home.filter.listing")}
-            value={listing}
-            onChange={setListing}
-            options={["Всички", "Продажба", "Наем"]}
-          />
-          <FilterSelect
-            label={language === "en" ? "City" : "Град"}
-            value={city}
-            onChange={setCity}
-            options={["Всички", ...cities]}
-          />
-          {type === "Апартамент" && (
-            <FilterSelect
-              label={t("home.filter.layout")}
-              value={layout}
-              onChange={setLayout}
-              options={["Всички", ...APARTMENT_LAYOUTS]}
-            />
-          )}
-          <FilterSelect
-            label={t("home.filter.district")}
-            value={district}
-            onChange={setDistrict}
-            options={districts}
-          />
-          <div className="flex flex-col gap-1.5">
-            <Label
-              htmlFor="filter-max-price"
-              className="text-xs uppercase tracking-wider text-muted-foreground"
-            >
-              {t("home.filter.price")}
-            </Label>
-            <Input
-              id="filter-max-price"
-              type="number"
-              inputMode="numeric"
-              placeholder={t("home.filter.priceExample")}
-              value={maxPrice}
-              onChange={(e) => setMaxPrice(e.target.value)}
-            />
+        <div className="mt-8 rounded-2xl border border-border/80 bg-card p-4 shadow-sm sm:mt-10 sm:p-6">
+          <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="font-display text-xl font-medium text-navy">
+                {t("home.filter.heading")}
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground">{t("home.filter.caption")}</p>
+            </div>
+            {hasActiveFilters && (
+              <Button
+                type="button"
+                variant="ghost"
+                className="min-h-11 rounded-full px-4 text-navy hover:bg-gold/10"
+                onClick={clearFilters}
+              >
+                {t("home.filter.clear")}
+              </Button>
+            )}
           </div>
-          <div className="flex flex-col gap-1.5">
-            <Label
-              htmlFor="filter-min-area"
-              className="text-xs uppercase tracking-wider text-muted-foreground"
-            >
-              {t("home.filter.area")}
-            </Label>
-            <Input
-              id="filter-min-area"
-              type="number"
-              inputMode="numeric"
-              placeholder={t("home.filter.areaExample")}
-              value={minArea}
-              onChange={(e) => setMinArea(e.target.value)}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <FilterSelect
+              label={t("home.filter.type")}
+              value={type}
+              onChange={(v) => {
+                setType(v);
+                if (v !== "Апартамент") setLayout("Всички");
+              }}
+              options={PROPERTY_TYPES as string[]}
             />
+            <FilterSelect
+              label={t("home.filter.listing")}
+              value={listing}
+              onChange={setListing}
+              options={["Всички", "Продажба", "Наем"]}
+            />
+            <FilterSelect
+              label={t("home.filter.city")}
+              value={city}
+              onChange={(value) => {
+                setCity(value);
+                setDistrict("Всички");
+              }}
+              options={["Всички", ...cities]}
+            />
+            {type === "Апартамент" && (
+              <FilterSelect
+                label={t("home.filter.layout")}
+                value={layout}
+                onChange={setLayout}
+                options={["Всички", ...APARTMENT_LAYOUTS]}
+              />
+            )}
+            <FilterSelect
+              label={t("home.filter.district")}
+              value={district}
+              onChange={setDistrict}
+              options={districts}
+            />
+            <div className="flex flex-col gap-1.5">
+              <Label
+                htmlFor="filter-max-price"
+                className="text-xs uppercase tracking-wider text-muted-foreground"
+              >
+                {t("home.filter.price")}
+              </Label>
+              <Input
+                id="filter-max-price"
+                type="number"
+                inputMode="numeric"
+                min="0"
+                step="1"
+                placeholder={t("home.filter.priceExample")}
+                value={maxPrice}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === "" || (Number.isFinite(Number(value)) && Number(value) >= 0))
+                    setMaxPrice(value);
+                }}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label
+                htmlFor="filter-min-area"
+                className="text-xs uppercase tracking-wider text-muted-foreground"
+              >
+                {t("home.filter.area")}
+              </Label>
+              <Input
+                id="filter-min-area"
+                type="number"
+                inputMode="numeric"
+                min="0"
+                step="0.1"
+                placeholder={t("home.filter.areaExample")}
+                value={minArea}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === "" || (Number.isFinite(Number(value)) && Number(value) >= 0))
+                    setMinArea(value);
+                }}
+              />
+            </div>
           </div>
         </div>
 
@@ -800,19 +873,7 @@ function Catalog({
         {!isLoading && filtered.length === 0 && (
           <div className="mt-10 rounded-2xl border border-dashed border-border p-8 text-center sm:p-12">
             <p className="text-muted-foreground">{t("home.filter.empty")}</p>
-            <Button
-              variant="outline"
-              className="mt-4 rounded-full"
-              onClick={() => {
-                setType("Всички");
-                setListing("Всички");
-                setCity("Всички");
-                setDistrict("Всички");
-                setLayout("Всички");
-                setMaxPrice("");
-                setMinArea("");
-              }}
-            >
+            <Button variant="outline" className="mt-4 min-h-11 rounded-full" onClick={clearFilters}>
               {t("home.filter.clear")}
             </Button>
           </div>
@@ -859,7 +920,11 @@ function FilterSelect({
 function PropertyCard({ p }: { p: Property }) {
   const { language, t } = useLanguage();
   const translate = useTranslateContent();
-  const priceText = new Intl.NumberFormat(language === "en" ? "en-GB" : "bg-BG").format(p.price);
+  const priceText = new Intl.NumberFormat(language === "en" ? "en-GB" : "bg-BG", {
+    style: "currency",
+    currency: "EUR",
+    maximumFractionDigits: 0,
+  }).format(p.price);
   return (
     <article className="property-card group relative flex flex-col overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm">
       <Link
@@ -872,7 +937,7 @@ function PropertyCard({ p }: { p: Property }) {
           {t("property.more")}: {p.title}
         </span>
       </Link>
-      <div className="pointer-events-none relative z-10 aspect-[4/3] overflow-hidden">
+      <div className="pointer-events-none relative z-10 aspect-[16/10] overflow-hidden bg-muted">
         {p.image ? (
           <img
             src={p.image}
@@ -902,23 +967,25 @@ function PropertyCard({ p }: { p: Property }) {
           {p.district ? `, ${p.district}` : ""}
         </p>
         {p.description && (
-          <p className="mt-3 line-clamp-3 whitespace-pre-line text-sm leading-relaxed text-foreground/75">
-            {p.description}
+          <p className="mt-3 line-clamp-2 whitespace-pre-line text-sm leading-relaxed text-foreground/75">
+            {p.description.replace(/\s+/g, " ").trim().slice(0, 180)}
           </p>
         )}
-        <div className="mt-5 flex flex-wrap gap-4 border-t border-border pt-4 text-xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1.5">
-            <Maximize2 className="h-3.5 w-3.5 text-gold" /> {p.area} м²
-          </span>
-        </div>
+        {p.area > 0 && Number.isFinite(p.area) && (
+          <div className="mt-5 flex flex-wrap gap-4 border-t border-border pt-4 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5">
+              <Maximize2 className="h-3.5 w-3.5 text-gold" /> {p.area} м²
+            </span>
+          </div>
+        )}
         <div className="mt-5 flex flex-wrap items-end justify-between gap-3">
           <div>
             <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
               {t("property.price")}
             </div>
             <div className="font-display text-2xl font-medium tabular-nums text-navy">
-              € {priceText}
-              {p.listing === "Наем" && (
+              {p.price > 0 && Number.isFinite(p.price) ? priceText : t("property.priceOnRequest")}
+              {p.price > 0 && p.listing === "Наем" && (
                 <span className="text-sm text-muted-foreground"> {t("property.month")}</span>
               )}
             </div>
@@ -934,7 +1001,9 @@ function PropertyCard({ p }: { p: Property }) {
               size="sm"
               className="min-h-11 rounded-full bg-navy text-white hover:bg-navy-deep"
             >
-              <a href="#contact">{t("property.viewing")}</a>
+              <a href={`/?inquiry=${encodeURIComponent(p.title)}#contact`}>
+                {t("property.viewing")}
+              </a>
             </Button>
             <ShareProperty property={p} compact />
           </div>
@@ -1030,10 +1099,17 @@ function Contact({ settings }: { settings: PublicSettings }) {
   const { language, t } = useLanguage();
   const translate = useTranslateContent();
   const workingHours = settings.working_hours[language].trim();
+  const [inquiry, setInquiry] = useState("");
   const [form, setForm] = useState({ name: "", phone: "", email: "", message: "", website: "" });
   const [sending, setSending] = useState(false);
   const [startedAt] = useState(() => Date.now());
   const sendInquiry = useServerFn(submitInquiry);
+
+  useEffect(() => {
+    setInquiry(
+      new URLSearchParams(window.location.search).get("inquiry")?.trim().slice(0, 200) ?? "",
+    );
+  }, []);
 
   function update<K extends keyof typeof form>(k: K, v: string) {
     setForm((f) => ({ ...f, [k]: v }));
@@ -1056,7 +1132,13 @@ function Contact({ settings }: { settings: PublicSettings }) {
           name: form.name.trim().slice(0, 100),
           phone: form.phone.trim().slice(0, 40),
           email: form.email.trim().slice(0, 255),
-          message: form.message.trim().slice(0, 2000),
+          message: [
+            inquiry ? t("contact.propertyInterest").replace("{title}", inquiry) : "",
+            form.message.trim(),
+          ]
+            .filter(Boolean)
+            .join("\n\n")
+            .slice(0, 2000),
           website: form.website,
           started_at: startedAt,
         },
@@ -1157,7 +1239,7 @@ function Contact({ settings }: { settings: PublicSettings }) {
 
           <form
             onSubmit={onSubmit}
-            className="relative rounded-2xl border border-border bg-card p-7 shadow-sm sm:p-10"
+            className="relative rounded-xl border border-border/80 bg-card p-5 shadow-sm sm:p-8"
           >
             {/* Honeypot: hidden from real users, bots tend to fill it in */}
             <div className="absolute -left-[9999px] h-0 w-0 overflow-hidden" aria-hidden="true">
@@ -1172,16 +1254,21 @@ function Contact({ settings }: { settings: PublicSettings }) {
                 onChange={(e) => update("website", e.target.value)}
               />
             </div>
+            {inquiry && (
+              <p className="mb-5 rounded-lg bg-muted px-4 py-3 text-sm text-navy" role="status">
+                {t("contact.propertyInterest").replace("{title}", inquiry)}
+              </p>
+            )}
             <div className="grid gap-5 sm:grid-cols-2">
               <Field
-                label="Име *"
+                label={t("contact.name")}
                 value={form.name}
                 onChange={(v) => update("name", v)}
                 required
                 autoComplete="name"
               />
               <Field
-                label="Телефон *"
+                label={t("contact.phone")}
                 value={form.phone}
                 onChange={(v) => update("phone", v)}
                 type="tel"
@@ -1190,7 +1277,7 @@ function Contact({ settings }: { settings: PublicSettings }) {
               />
               <div className="sm:col-span-2">
                 <Field
-                  label="Имейл"
+                  label={t("contact.email")}
                   value={form.email}
                   onChange={(v) => update("email", v)}
                   type="email"
@@ -1215,6 +1302,7 @@ function Contact({ settings }: { settings: PublicSettings }) {
                   }}
                   rows={5}
                   maxLength={1000}
+                  required
                   placeholder={t("contact.tellUs")}
                   className="min-h-[140px] resize-none overflow-hidden"
                 />

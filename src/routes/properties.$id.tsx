@@ -159,13 +159,25 @@ export const Route = createFileRoute("/properties/$id")({
             description: desc,
             url,
             ...(imageUrl ? { image: imageUrl } : {}),
-            floorSize: { "@type": "QuantitativeValue", value: loaderData.area, unitCode: "MTK" },
-            offers: {
-              "@type": "Offer",
-              price: loaderData.price,
-              priceCurrency: "EUR",
-              availability: "https://schema.org/InStock",
-            },
+            ...(loaderData.area > 0
+              ? {
+                  floorSize: {
+                    "@type": "QuantitativeValue",
+                    value: loaderData.area,
+                    unitCode: "MTK",
+                  },
+                }
+              : {}),
+            ...(loaderData.price > 0
+              ? {
+                  offers: {
+                    "@type": "Offer",
+                    price: loaderData.price,
+                    priceCurrency: "EUR",
+                    availability: "https://schema.org/InStock",
+                  },
+                }
+              : {}),
             address: {
               "@type": "PostalAddress",
               addressLocality: loaderData.city,
@@ -224,7 +236,11 @@ function PropertyDetail() {
   const pointerStart = useRef<{ x: number; y: number } | null>(null);
   const suppressPhotoClickUntil = useRef(0);
 
-  const priceText = new Intl.NumberFormat(language === "en" ? "en-GB" : "bg-BG").format(p.price);
+  const priceText = new Intl.NumberFormat(language === "en" ? "en-GB" : "bg-BG", {
+    style: "currency",
+    currency: "EUR",
+    maximumFractionDigits: 0,
+  }).format(p.price);
   const current = p.media[active];
   const hasMultipleMedia = p.media.length > 1;
   const showPrevious = () => setActive((index) => (index - 1 + p.media.length) % p.media.length);
@@ -239,7 +255,11 @@ function PropertyDetail() {
   };
   const phone = settings.phone1;
   const tel = `tel:${(phone ?? "").replace(/\s+/g, "")}`;
-  const wa = `https://wa.me/${(phone ?? "").replace(/[^0-9]/g, "")}`;
+  const propertyUrl = new URL(`/properties/${encodeURIComponent(p.id)}`, SITE_URL).href;
+  const waMessage = t("property.whatsappInterest")
+    .replace("{title}", p.title)
+    .replace("{url}", propertyUrl);
+  const wa = `https://wa.me/${(phone ?? "").replace(/[^0-9]/g, "")}?text=${encodeURIComponent(waMessage)}`;
 
   return (
     <main lang={language} className="min-h-screen bg-background pb-20">
@@ -517,10 +537,12 @@ function PropertyDetail() {
         <div className="mt-8 grid gap-8 lg:grid-cols-3">
           <div className="lg:col-span-2">
             <div
-              className={`grid grid-cols-2 gap-3 ${p.yardArea != null ? "sm:grid-cols-5" : "sm:grid-cols-4"}`}
+              className={`grid grid-cols-2 gap-3 ${p.yardArea != null && p.yardArea > 0 ? "sm:grid-cols-5" : "sm:grid-cols-4"}`}
             >
-              <Spec icon={Maximize2} label={t("property.area")} value={`${p.area} m²`} />
-              {p.yardArea != null && (
+              {p.area > 0 && (
+                <Spec icon={Maximize2} label={t("property.area")} value={`${p.area} m²`} />
+              )}
+              {p.yardArea != null && p.yardArea > 0 && (
                 <Spec icon={Maximize2} label={t("property.yardArea")} value={`${p.yardArea} m²`} />
               )}
               {p.floor && (
@@ -593,27 +615,31 @@ function PropertyDetail() {
               {t("property.price")}
             </div>
             <div className="font-display text-3xl font-medium text-navy">
-              € {priceText}
-              {p.listing === "Наем" && (
+              {p.price > 0 && Number.isFinite(p.price) ? priceText : t("property.priceOnRequest")}
+              {p.price > 0 && p.listing === "Наем" && (
                 <span className="text-base text-muted-foreground"> {t("property.month")}</span>
               )}
             </div>
             <p className="mt-3 text-sm text-muted-foreground">{t("property.contactPrompt")}</p>
             <div className="mt-5 flex flex-col gap-3">
-              <Button asChild className="rounded-full bg-navy text-white hover:bg-navy-deep">
-                <a href={tel}>
-                  <Phone className="mr-2 h-4 w-4" /> {phone}
-                </a>
-              </Button>
-              <Button asChild variant="outline" className="rounded-full">
-                <a href={wa} target="_blank" rel="noopener noreferrer">
-                  <MessageCircle className="mr-2 h-4 w-4" /> WhatsApp
-                </a>
-              </Button>
+              {phone && (
+                <Button asChild className="rounded-full bg-navy text-white hover:bg-navy-deep">
+                  <a href={tel}>
+                    <Phone className="mr-2 h-4 w-4" /> {phone}
+                  </a>
+                </Button>
+              )}
+              {phone && (
+                <Button asChild variant="outline" className="rounded-full">
+                  <a href={wa} target="_blank" rel="noopener noreferrer">
+                    <MessageCircle className="mr-2 h-4 w-4" /> WhatsApp
+                  </a>
+                </Button>
+              )}
               <Button asChild variant="ghost" className="rounded-full">
-                <Link to="/" hash="contact">
+                <a href={`/?inquiry=${encodeURIComponent(p.title)}#contact`}>
                   {t("property.sendInquiry")}
-                </Link>
+                </a>
               </Button>
             </div>
           </aside>

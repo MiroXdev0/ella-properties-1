@@ -983,7 +983,7 @@ function PropertyDialog({
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="Град">
+            <Field label="Населено място">
               <Input
                 value={form.city}
                 onChange={(e) => setForm({ ...form, city: e.target.value })}
