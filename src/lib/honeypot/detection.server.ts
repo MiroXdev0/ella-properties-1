@@ -12,6 +12,23 @@ const DECOY_ENDPOINTS = new Map<string, string>([
   ["/phpmyadmin", "Database administration decoy requested"],
 ]);
 
+const PASSWORDS_DECOY = {
+  accounts: [
+    {
+      username: "demo_admin",
+      email: "demo_admin@example.com",
+      password: "NOT-A-REAL-PASSWORD",
+      note: "Fictional sample account; not a valid login",
+    },
+    {
+      username: "backup_service",
+      email: "backup_service@example.net",
+      password: "EXAMPLE-ONLY-DO-NOT-USE",
+      note: "Fictional sample account; not a valid login",
+    },
+  ],
+};
+
 const ipSchema = z.string().ip();
 
 type CloudflareMetadata = {
@@ -224,6 +241,20 @@ export async function handleHoneypotRequest(request: Request): Promise<Response 
       status: 503,
       headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
     });
+  }
+
+  if (pathname === "/passwords.json") {
+    return new Response(
+      request.method === "HEAD" ? null : JSON.stringify(PASSWORDS_DECOY, null, 2),
+      {
+        status: 200,
+        headers: {
+          "content-type": "application/json; charset=utf-8",
+          "cache-control": "no-store",
+          "x-content-type-options": "nosniff",
+        },
+      },
+    );
   }
 
   return new Response("Not found", {
