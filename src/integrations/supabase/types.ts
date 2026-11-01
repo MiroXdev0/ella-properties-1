@@ -70,6 +70,322 @@ export type Database = {
         };
         Relationships: [];
       };
+      honeypot_visitors: {
+        Row: {
+          as_organization: string | null;
+          asn: number | null;
+          browser: string | null;
+          browser_version: string | null;
+          city: string | null;
+          country: string | null;
+          country_code: string | null;
+          created_at: string;
+          device_type: string | null;
+          first_seen: string;
+          hosting_classification: string | null;
+          id: string;
+          identity_purged_at: string | null;
+          ip_address: string | null;
+          is_trusted: boolean;
+          last_seen: string;
+          metadata_sources: Json;
+          operating_system: string | null;
+          region: string | null;
+          request_count: number;
+          source_hash: string;
+          updated_at: string;
+          user_agent: string | null;
+        };
+        Insert: {
+          as_organization?: string | null;
+          asn?: number | null;
+          browser?: string | null;
+          browser_version?: string | null;
+          city?: string | null;
+          country?: string | null;
+          country_code?: string | null;
+          created_at?: string;
+          device_type?: string | null;
+          first_seen?: string;
+          hosting_classification?: string | null;
+          id?: string;
+          identity_purged_at?: string | null;
+          ip_address?: string | null;
+          is_trusted?: boolean;
+          last_seen?: string;
+          metadata_sources?: Json;
+          operating_system?: string | null;
+          region?: string | null;
+          request_count?: number;
+          source_hash: string;
+          updated_at?: string;
+          user_agent?: string | null;
+        };
+        Update: {
+          as_organization?: string | null;
+          asn?: number | null;
+          browser?: string | null;
+          browser_version?: string | null;
+          city?: string | null;
+          country?: string | null;
+          country_code?: string | null;
+          created_at?: string;
+          device_type?: string | null;
+          first_seen?: string;
+          hosting_classification?: string | null;
+          id?: string;
+          identity_purged_at?: string | null;
+          ip_address?: string | null;
+          is_trusted?: boolean;
+          last_seen?: string;
+          metadata_sources?: Json;
+          operating_system?: string | null;
+          region?: string | null;
+          request_count?: number;
+          source_hash?: string;
+          updated_at?: string;
+          user_agent?: string | null;
+        };
+        Relationships: [];
+      };
+      honeypot_events: {
+        Row: {
+          created_at: string;
+          detected_at: string;
+          detection_reason: string;
+          endpoint: string;
+          id: string;
+          hostname: string;
+          referrer: string | null;
+          request_method: string;
+          status: string;
+          user_agent: string | null;
+          visitor_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          detected_at?: string;
+          detection_reason: string;
+          endpoint: string;
+          id?: string;
+          hostname: string;
+          referrer?: string | null;
+          request_method: string;
+          status?: string;
+          user_agent?: string | null;
+          visitor_id: string;
+        };
+        Update: {
+          created_at?: string;
+          detected_at?: string;
+          detection_reason?: string;
+          endpoint?: string;
+          id?: string;
+          hostname?: string;
+          referrer?: string | null;
+          request_method?: string;
+          status?: string;
+          user_agent?: string | null;
+          visitor_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "honeypot_events_visitor_id_fkey";
+            columns: ["visitor_id"];
+            isOneToOne: false;
+            referencedRelation: "honeypot_visitors";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      honeypot_activity: {
+        Row: {
+          activity_type: string;
+          created_at: string;
+          event_id: string;
+          id: string;
+          occurred_at: string;
+          visitor_id: string;
+        };
+        Insert: {
+          activity_type?: string;
+          created_at?: string;
+          event_id: string;
+          id?: string;
+          occurred_at?: string;
+          visitor_id: string;
+        };
+        Update: {
+          activity_type?: string;
+          created_at?: string;
+          event_id?: string;
+          id?: string;
+          occurred_at?: string;
+          visitor_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "honeypot_activity_event_visitor_fkey";
+            columns: ["event_id", "visitor_id"];
+            isOneToOne: true;
+            referencedRelation: "honeypot_events";
+            referencedColumns: ["id", "visitor_id"];
+          },
+        ];
+      };
+      honeypot_ip_restrictions: {
+        Row: {
+          administrator_id: string;
+          cloudflare_rule_id: string | null;
+          created_at: string;
+          duration: string;
+          expires_at: string | null;
+          id: string;
+          ip_address: string | null;
+          reason: string;
+          released_at: string | null;
+          status: string;
+          updated_at: string;
+          visitor_id: string | null;
+        };
+        Insert: {
+          administrator_id: string;
+          cloudflare_rule_id?: string | null;
+          created_at?: string;
+          duration: string;
+          expires_at?: string | null;
+          id?: string;
+          ip_address?: string | null;
+          reason: string;
+          released_at?: string | null;
+          status?: string;
+          updated_at?: string;
+          visitor_id?: string | null;
+        };
+        Update: {
+          administrator_id?: string;
+          cloudflare_rule_id?: string | null;
+          created_at?: string;
+          duration?: string;
+          expires_at?: string | null;
+          id?: string;
+          ip_address?: string | null;
+          reason?: string;
+          released_at?: string | null;
+          status?: string;
+          updated_at?: string;
+          visitor_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "honeypot_ip_restrictions_visitor_id_fkey";
+            columns: ["visitor_id"];
+            isOneToOne: false;
+            referencedRelation: "honeypot_visitors";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      honeypot_admin_notes: {
+        Row: {
+          administrator_id: string;
+          created_at: string;
+          event_id: string | null;
+          id: string;
+          note: string;
+          visitor_id: string;
+        };
+        Insert: {
+          administrator_id: string;
+          created_at?: string;
+          event_id?: string | null;
+          id?: string;
+          note: string;
+          visitor_id: string;
+        };
+        Update: {
+          administrator_id?: string;
+          created_at?: string;
+          event_id?: string | null;
+          id?: string;
+          note?: string;
+          visitor_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "honeypot_admin_notes_event_visitor_fkey";
+            columns: ["event_id", "visitor_id"];
+            isOneToOne: false;
+            referencedRelation: "honeypot_events";
+            referencedColumns: ["id", "visitor_id"];
+          },
+          {
+            foreignKeyName: "honeypot_admin_notes_visitor_id_fkey";
+            columns: ["visitor_id"];
+            isOneToOne: false;
+            referencedRelation: "honeypot_visitors";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      honeypot_admin_audit: {
+        Row: {
+          action: string;
+          administrator_id: string | null;
+          created_at: string;
+          details: Json;
+          event_id: string | null;
+          id: string;
+          outcome: string;
+          restriction_id: string | null;
+          visitor_id: string | null;
+        };
+        Insert: {
+          action: string;
+          administrator_id?: string | null;
+          created_at?: string;
+          details?: Json;
+          event_id?: string | null;
+          id?: string;
+          outcome?: string;
+          restriction_id?: string | null;
+          visitor_id?: string | null;
+        };
+        Update: {
+          action?: string;
+          administrator_id?: string | null;
+          created_at?: string;
+          details?: Json;
+          event_id?: string | null;
+          id?: string;
+          outcome?: string;
+          restriction_id?: string | null;
+          visitor_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "honeypot_admin_audit_event_id_fkey";
+            columns: ["event_id"];
+            isOneToOne: false;
+            referencedRelation: "honeypot_events";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "honeypot_admin_audit_restriction_id_fkey";
+            columns: ["restriction_id"];
+            isOneToOne: false;
+            referencedRelation: "honeypot_ip_restrictions";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "honeypot_admin_audit_visitor_id_fkey";
+            columns: ["visitor_id"];
+            isOneToOne: false;
+            referencedRelation: "honeypot_visitors";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       profiles: {
         Row: {
           created_at: string;
@@ -544,6 +860,48 @@ export type Database = {
           _property_id: string;
         };
         Returns: string;
+      };
+      record_honeypot_detection: {
+        Args: {
+          p_as_organization: string | null;
+          p_asn: number | null;
+          p_browser: string | null;
+          p_browser_version: string | null;
+          p_city: string | null;
+          p_country: string | null;
+          p_country_code: string | null;
+          p_device_type: string | null;
+          p_detection_reason: string;
+          p_endpoint: string;
+          p_hosting_classification: string | null;
+          p_hostname: string;
+          p_ip_address: string | null;
+          p_is_trusted: boolean;
+          p_metadata_sources: Json;
+          p_operating_system: string | null;
+          p_referrer: string | null;
+          p_region: string | null;
+          p_request_method: string;
+          p_source_hash: string;
+          p_user_agent: string | null;
+        };
+        Returns: {
+          event_id: string;
+          request_count: number;
+          visitor_id: string;
+        }[];
+      };
+      purge_honeypot_data: {
+        Args: Record<PropertyKey, never>;
+        Returns: number;
+      };
+      honeypot_hourly_volume: {
+        Args: Record<PropertyKey, never>;
+        Returns: { event_count: number; hour: string }[];
+      };
+      honeypot_hosts_match_zone: {
+        Args: { p_visitor_id: string; p_zone_hostname: string };
+        Returns: boolean;
       };
     };
     Enums: {

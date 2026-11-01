@@ -55,12 +55,31 @@ The deploy script builds the app and deploys it using `wrangler.jsonc`, preservi
 
 Supabase remains an external backend dependency for authentication, property/site data, storage, and privileged server operations. Apply database migrations from `supabase/migrations/` through your Supabase deployment process; this project does not modify production data during build or deployment.
 
+## Honeypot Monitor
+
+The admin-only Honeypot Monitor records requests to `/passwords.json` and the monitored decoy paths in `src/lib/honeypot/detection.server.ts`. The Worker returns a generic not-found response and never serves decoy credentials. Source identifiers are HMAC-pseudonymized from canonical IP addresses; a source record represents an IP, not a uniquely identified person, so shared/NAT addresses can combine unrelated users. Raw IP addresses and visitor records are accessible only through server functions that verify the Supabase `admin` role. Event, activity, notes, restriction, and audit tables have forced RLS and deny table access to `anon` and `authenticated`; the server-only Worker service-role client is the sole application data path. Latest visitor metadata replaces unavailable values rather than carrying stale values forward.
+
+Events and notes are deleted after 90 days. Inactive visitor records are deleted after 90 days without activity. Visitors with a still-active restriction retain only a minimal linked record after 90 days: source metadata and the duplicate visitor IP are purged, while the enforcement record retains its IP until the restriction ends. Inactive restriction records and their IP addresses are removed after 365 days; administrative audit records are retained for 365 days. The Worker’s five-minute Cron Trigger runs this cleanup as well as temporary restriction expiry.
+
+Before enabling it in a deployment:
+
+1. Apply `supabase/migrations/20261101183112_honeypot_monitor.sql` to the intended Supabase project. Do not apply it to production without the normal database review/approval process.
+   Before staging, run the migration and `supabase/tests/honeypot_monitor.test.sql` against a disposable local Supabase database with `supabase test db`; the test fixtures are wrapped in a transaction and rolled back.
+2. Set the Worker runtime secrets `HONEYPOT_HASH_SECRET` (random, at least 32 characters), `CLOUDFLARE_API_TOKEN`, and the existing `SUPABASE_SERVICE_ROLE_KEY`. Keep all of these server-side.
+3. Set `CLOUDFLARE_ZONE_ID`, `CLOUDFLARE_ZONE_HOSTNAME` (the exact zone hostname, such as `example.com`), and optionally `HONEYPOT_TRUSTED_IPS` (comma-separated exact staff/VPN egress IP addresses) as Worker runtime variables. The Worker verifies the hostname against the configured zone before applying a restriction. Keep trusted addresses current; the active administrator request IP is also protected when applying a restriction.
+4. Create a Cloudflare API token scoped to the target zone with **Zone Read** and **Zone Firewall Services Edit** permissions. The integration uses zone-scoped IP Access Rules, verifies every created/deleted rule through Cloudflare's API, and refuses to mark an unverified rule active. These rules apply only to requests routed through that proxied zone; the site's default `workers.dev` hostname is not covered. Restriction actions are refused when a source has accessed any hostname outside the configured zone. Configure and serve the site through its proxied custom domain before relying on IP restrictions.
+5. Deploy through the existing Worker release process to activate the configured five-minute Cron Trigger. Temporary restrictions are removed by this Worker job; their expiration can be delayed by up to one cron interval, and a Cloudflare API outage leaves the removal pending for retry. The same schedule runs the 90-day and 365-day retention cleanup.
+
+Restrictions are never automatic. An administrator must choose a duration, provide a reason, and confirm the action; permanent restrictions require explicitly selecting **Permanent**. The first deployment should be treated as a security change review because a later administrator action can create live Cloudflare block rules. Do not deploy or apply the migration as part of local validation.
+
 ## Routes
 
 - `/` — public home page and published-property catalogue.
 - `/properties/:id` — published property details.
 - `/privacy`, `/cookies`, `/terms`, `/data-request` — legal and data-rights information.
 - `/auth`, `/reset-password`, and `/admin/*` — authentication and staff tools; these are not public indexable pages.
+- `/admin/honeypot` — administrator-only honeypot overview and event monitor.
+- `/admin/honeypot/:visitorId` — administrator-only visitor investigation, notes, and verified restriction controls.
 - `/sitemap.xml` and `/robots.txt` — crawler discovery.
 
 Property listings and site settings are loaded from Supabase. Keep public contact details and business claims in the site settings accurate, and review legal information with the responsible business owner before publication.

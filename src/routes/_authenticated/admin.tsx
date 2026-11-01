@@ -14,6 +14,7 @@ import {
   ArrowUpRight,
   ChevronRight,
   Sparkles,
+  ShieldAlert,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,7 @@ type NavItem = {
   icon: typeof LayoutDashboard;
   exact?: boolean;
   adminOnly?: boolean;
+  section?: string;
 };
 
 const NAV: NavItem[] = [
@@ -46,6 +48,13 @@ const NAV: NavItem[] = [
   { to: "/admin/team", label: "Екип", icon: Users, adminOnly: true },
   { to: "/admin/users", label: "Потребители", icon: Users, adminOnly: true },
   { to: "/admin/settings", label: "Настройки", icon: Settings, adminOnly: true },
+  {
+    to: "/admin/honeypot",
+    label: "Honeypot Monitor",
+    icon: ShieldAlert,
+    adminOnly: true,
+    section: "Разширени",
+  },
 ];
 
 function AdminLayout() {
@@ -112,33 +121,39 @@ function AdminLayout() {
             {items.map((n) => {
               const active = isActive(n.to, n.exact);
               return (
-                <Link
-                  key={n.to}
-                  to={n.to}
-                  onClick={() => setOpen(false)}
-                  aria-current={active ? "page" : undefined}
-                  className={cn(
-                    "group flex min-h-12 items-center gap-3 rounded-xl px-3.5 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-[#10213b]",
-                    active
-                      ? "bg-white/10 text-white shadow-inner shadow-white/[0.02]"
-                      : "text-white/65 hover:bg-white/[0.06] hover:text-white",
+                <div key={n.to}>
+                  {n.section && (
+                    <div className="mb-2 mt-7 px-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/35">
+                      {n.section}
+                    </div>
                   )}
-                >
-                  <span
+                  <Link
+                    to={n.to}
+                    onClick={() => setOpen(false)}
+                    aria-current={active ? "page" : undefined}
                     className={cn(
-                      "grid h-8 w-8 place-items-center rounded-lg transition-colors",
+                      "group flex min-h-12 items-center gap-3 rounded-xl px-3.5 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-[#10213b]",
                       active
-                        ? "bg-gold text-navy-deep"
-                        : "bg-white/[0.05] text-white/55 group-hover:bg-white/10 group-hover:text-white",
+                        ? "bg-white/10 text-white shadow-inner shadow-white/[0.02]"
+                        : "text-white/65 hover:bg-white/[0.06] hover:text-white",
                     )}
                   >
-                    <n.icon className="h-4 w-4" aria-hidden="true" />
-                  </span>
-                  {n.label}
-                  {active && (
-                    <ChevronRight className="ml-auto h-4 w-4 text-gold" aria-hidden="true" />
-                  )}
-                </Link>
+                    <span
+                      className={cn(
+                        "grid h-8 w-8 place-items-center rounded-lg transition-colors",
+                        active
+                          ? "bg-gold text-navy-deep"
+                          : "bg-white/[0.05] text-white/55 group-hover:bg-white/10 group-hover:text-white",
+                      )}
+                    >
+                      <n.icon className="h-4 w-4" aria-hidden="true" />
+                    </span>
+                    {n.label}
+                    {active && (
+                      <ChevronRight className="ml-auto h-4 w-4 text-gold" aria-hidden="true" />
+                    )}
+                  </Link>
+                </div>
               );
             })}
           </div>

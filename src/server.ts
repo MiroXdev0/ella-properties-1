@@ -1,5 +1,7 @@
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { handleHoneypotRequest, runHoneypotRetention } from "./lib/honeypot/detection.server";
+import { expireCloudflareRestrictions } from "./lib/honeypot/cloudflare.server";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -51,12 +53,19 @@ function withSecurityHeaders(response: Response): Response {
   for (const [k, v] of Object.entries(SECURITY_HEADERS)) {
     if (!headers.has(k)) headers.set(k, v);
   }
-  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }
 
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      const honeypotResponse = await handleHoneypotRequest(request);
+      if (honeypotResponse) return withSecurityHeaders(honeypotResponse);
+
       const len = Number(request.headers.get("content-length") ?? 0);
       if (request.method !== "GET" && request.method !== "HEAD" && len > MAX_BODY_BYTES) {
         return withSecurityHeaders(new Response("Payload too large", { status: 413 }));
@@ -74,9 +83,17 @@ export default {
       );
     }
   },
+  async scheduled() {
+    try {
+      await expireCloudflareRestrictions();
+    } catch {
+      console.error("[honeypot] Scheduled IP restriction expiry failed");
+    }
+
+    try {
+      await runHoneypotRetention();
+    } catch {
+      console.error("[honeypot] Scheduled retention cleanup failed");
+    }
+  },
 };
-
-
-
-
-

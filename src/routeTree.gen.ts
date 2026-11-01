@@ -30,7 +30,9 @@ import { Route as AuthenticatedAdminSettingsRouteImport } from './routes/_authen
 import { Route as AuthenticatedAdminPropertiesRouteImport } from './routes/_authenticated/admin.properties'
 import { Route as AuthenticatedAdminPagesRouteImport } from './routes/_authenticated/admin.pages'
 import { Route as AuthenticatedAdminInquiriesRouteImport } from './routes/_authenticated/admin.inquiries'
+import { Route as AuthenticatedAdminHoneypotRouteImport } from './routes/_authenticated/admin.honeypot'
 import { Route as ApiPublicMediaSplatRouteImport } from './routes/api/public/media.$'
+import { Route as AuthenticatedAdminHoneypotVisitorIdRouteImport } from './routes/_authenticated/admin.honeypot.$visitorId'
 
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
@@ -139,11 +141,23 @@ const AuthenticatedAdminInquiriesRoute =
     path: '/inquiries',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminHoneypotRoute =
+  AuthenticatedAdminHoneypotRouteImport.update({
+    id: '/honeypot',
+    path: '/honeypot',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const ApiPublicMediaSplatRoute = ApiPublicMediaSplatRouteImport.update({
   id: '/api/public/media/$',
   path: '/api/public/media/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedAdminHoneypotVisitorIdRoute =
+  AuthenticatedAdminHoneypotVisitorIdRouteImport.update({
+    id: '/$visitorId',
+    path: '/$visitorId',
+    getParentRoute: () => AuthenticatedAdminHoneypotRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -159,6 +173,7 @@ export interface FileRoutesByFullPath {
   '/imoti-v/$slug': typeof ImotiVSlugRoute
   '/pages/$slug': typeof PagesSlugRoute
   '/properties/$id': typeof PropertiesIdRoute
+  '/admin/honeypot': typeof AuthenticatedAdminHoneypotRouteWithChildren
   '/admin/inquiries': typeof AuthenticatedAdminInquiriesRoute
   '/admin/pages': typeof AuthenticatedAdminPagesRoute
   '/admin/properties': typeof AuthenticatedAdminPropertiesRoute
@@ -166,6 +181,7 @@ export interface FileRoutesByFullPath {
   '/admin/team': typeof AuthenticatedAdminTeamRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
+  '/admin/honeypot/$visitorId': typeof AuthenticatedAdminHoneypotVisitorIdRoute
   '/api/public/media/$': typeof ApiPublicMediaSplatRoute
 }
 export interface FileRoutesByTo {
@@ -181,6 +197,7 @@ export interface FileRoutesByTo {
   '/imoti-v/$slug': typeof ImotiVSlugRoute
   '/pages/$slug': typeof PagesSlugRoute
   '/properties/$id': typeof PropertiesIdRoute
+  '/admin/honeypot': typeof AuthenticatedAdminHoneypotRouteWithChildren
   '/admin/inquiries': typeof AuthenticatedAdminInquiriesRoute
   '/admin/pages': typeof AuthenticatedAdminPagesRoute
   '/admin/properties': typeof AuthenticatedAdminPropertiesRoute
@@ -188,6 +205,7 @@ export interface FileRoutesByTo {
   '/admin/team': typeof AuthenticatedAdminTeamRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
+  '/admin/honeypot/$visitorId': typeof AuthenticatedAdminHoneypotVisitorIdRoute
   '/api/public/media/$': typeof ApiPublicMediaSplatRoute
 }
 export interface FileRoutesById {
@@ -206,6 +224,7 @@ export interface FileRoutesById {
   '/imoti-v/$slug': typeof ImotiVSlugRoute
   '/pages/$slug': typeof PagesSlugRoute
   '/properties/$id': typeof PropertiesIdRoute
+  '/_authenticated/admin/honeypot': typeof AuthenticatedAdminHoneypotRouteWithChildren
   '/_authenticated/admin/inquiries': typeof AuthenticatedAdminInquiriesRoute
   '/_authenticated/admin/pages': typeof AuthenticatedAdminPagesRoute
   '/_authenticated/admin/properties': typeof AuthenticatedAdminPropertiesRoute
@@ -213,6 +232,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/team': typeof AuthenticatedAdminTeamRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
+  '/_authenticated/admin/honeypot/$visitorId': typeof AuthenticatedAdminHoneypotVisitorIdRoute
   '/api/public/media/$': typeof ApiPublicMediaSplatRoute
 }
 export interface FileRouteTypes {
@@ -231,6 +251,7 @@ export interface FileRouteTypes {
     | '/imoti-v/$slug'
     | '/pages/$slug'
     | '/properties/$id'
+    | '/admin/honeypot'
     | '/admin/inquiries'
     | '/admin/pages'
     | '/admin/properties'
@@ -238,6 +259,7 @@ export interface FileRouteTypes {
     | '/admin/team'
     | '/admin/users'
     | '/admin/'
+    | '/admin/honeypot/$visitorId'
     | '/api/public/media/$'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -253,6 +275,7 @@ export interface FileRouteTypes {
     | '/imoti-v/$slug'
     | '/pages/$slug'
     | '/properties/$id'
+    | '/admin/honeypot'
     | '/admin/inquiries'
     | '/admin/pages'
     | '/admin/properties'
@@ -260,6 +283,7 @@ export interface FileRouteTypes {
     | '/admin/team'
     | '/admin/users'
     | '/admin'
+    | '/admin/honeypot/$visitorId'
     | '/api/public/media/$'
   id:
     | '__root__'
@@ -277,6 +301,7 @@ export interface FileRouteTypes {
     | '/imoti-v/$slug'
     | '/pages/$slug'
     | '/properties/$id'
+    | '/_authenticated/admin/honeypot'
     | '/_authenticated/admin/inquiries'
     | '/_authenticated/admin/pages'
     | '/_authenticated/admin/properties'
@@ -284,6 +309,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/team'
     | '/_authenticated/admin/users'
     | '/_authenticated/admin/'
+    | '/_authenticated/admin/honeypot/$visitorId'
     | '/api/public/media/$'
   fileRoutesById: FileRoutesById
 }
@@ -453,6 +479,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminInquiriesRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/honeypot': {
+      id: '/_authenticated/admin/honeypot'
+      path: '/honeypot'
+      fullPath: '/admin/honeypot'
+      preLoaderRoute: typeof AuthenticatedAdminHoneypotRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/api/public/media/$': {
       id: '/api/public/media/$'
       path: '/api/public/media/$'
@@ -460,10 +493,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicMediaSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/admin/honeypot/$visitorId': {
+      id: '/_authenticated/admin/honeypot/$visitorId'
+      path: '/$visitorId'
+      fullPath: '/admin/honeypot/$visitorId'
+      preLoaderRoute: typeof AuthenticatedAdminHoneypotVisitorIdRouteImport
+      parentRoute: typeof AuthenticatedAdminHoneypotRoute
+    }
   }
 }
 
+interface AuthenticatedAdminHoneypotRouteChildren {
+  AuthenticatedAdminHoneypotVisitorIdRoute: typeof AuthenticatedAdminHoneypotVisitorIdRoute
+}
+
+const AuthenticatedAdminHoneypotRouteChildren: AuthenticatedAdminHoneypotRouteChildren =
+  {
+    AuthenticatedAdminHoneypotVisitorIdRoute:
+      AuthenticatedAdminHoneypotVisitorIdRoute,
+  }
+
+const AuthenticatedAdminHoneypotRouteWithChildren =
+  AuthenticatedAdminHoneypotRoute._addFileChildren(
+    AuthenticatedAdminHoneypotRouteChildren,
+  )
+
 interface AuthenticatedAdminRouteChildren {
+  AuthenticatedAdminHoneypotRoute: typeof AuthenticatedAdminHoneypotRouteWithChildren
   AuthenticatedAdminInquiriesRoute: typeof AuthenticatedAdminInquiriesRoute
   AuthenticatedAdminPagesRoute: typeof AuthenticatedAdminPagesRoute
   AuthenticatedAdminPropertiesRoute: typeof AuthenticatedAdminPropertiesRoute
@@ -474,6 +530,7 @@ interface AuthenticatedAdminRouteChildren {
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
+  AuthenticatedAdminHoneypotRoute: AuthenticatedAdminHoneypotRouteWithChildren,
   AuthenticatedAdminInquiriesRoute: AuthenticatedAdminInquiriesRoute,
   AuthenticatedAdminPagesRoute: AuthenticatedAdminPagesRoute,
   AuthenticatedAdminPropertiesRoute: AuthenticatedAdminPropertiesRoute,
