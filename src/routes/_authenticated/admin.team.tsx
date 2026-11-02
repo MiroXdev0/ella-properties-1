@@ -47,6 +47,7 @@ function TeamAdmin() {
   const [form, setForm] = useState(empty);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const teamQuery = useQuery({
     queryKey: ["admin-team"],
@@ -122,16 +123,25 @@ function TeamAdmin() {
   async function save(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name.trim()) return toast.error("Въведете име");
-    if (editing) {
-      const { error } = await supabase.from("team_members").update(form).eq("id", editing.id);
-      if (error) return toast.error(error.message);
-    } else {
-      const { error } = await supabase.from("team_members").insert(form);
-      if (error) return toast.error(error.message);
+    if (uploading || saving) return;
+    setSaving(true);
+    try {
+      if (editing) {
+        const { error } = await supabase.from("team_members").update(form).eq("id", editing.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("team_members").insert(form);
+        if (error) throw error;
+      }
+      toast.success("Запазено");
+      setOpen(false);
+      await qc.invalidateQueries({ queryKey: ["admin-team"] });
+    } catch (error) {
+      console.error("[admin-team] Unable to save team member", error);
+      toast.error(error instanceof Error ? error.message : "Промените не бяха запазени.");
+    } finally {
+      setSaving(false);
     }
-    toast.success("Запазено");
-    setOpen(false);
-    qc.invalidateQueries({ queryKey: ["admin-team"] });
   }
 
   async function del(id: string) {
@@ -223,7 +233,13 @@ function TeamAdmin() {
         </div>
       )}
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog
+        open={open}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen && (saving || uploading)) return;
+          setOpen(nextOpen);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="font-display text-2xl text-navy">
@@ -301,11 +317,20 @@ function TeamAdmin() {
               Активен
             </label>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={saving || uploading}
+                onClick={() => setOpen(false)}
+              >
                 Откажи
               </Button>
-              <Button type="submit" className="bg-navy hover:bg-navy-deep">
-                Запази
+              <Button
+                type="submit"
+                disabled={saving || uploading}
+                className="bg-navy hover:bg-navy-deep"
+              >
+                {saving ? "Запазване..." : uploading ? "Изчакайте качването..." : "Запази"}
               </Button>
             </DialogFooter>
           </form>

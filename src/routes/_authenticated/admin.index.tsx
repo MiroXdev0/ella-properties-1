@@ -11,10 +11,13 @@ import {
   Settings,
   FileText,
   Sparkles,
+  ShieldAlert,
+  ArrowUpRight,
 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { fetchStats } from "@/lib/admin/queries";
+import { getSecurityOverview } from "@/lib/admin/security.functions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Route as AuthenticatedRoute } from "./route";
@@ -26,6 +29,17 @@ export const Route = createFileRoute("/_authenticated/admin/")({
 function Dashboard() {
   const { isAdmin } = AuthenticatedRoute.useRouteContext();
   const statsQuery = useQuery({ queryKey: ["admin-stats"], queryFn: fetchStats });
+  const securityQuery = useQuery({
+    queryKey: ["site-security", "overview", "24h"],
+    queryFn: () => {
+      const to = new Date();
+      return getSecurityOverview({
+        data: { from: new Date(to.getTime() - 86_400_000).toISOString(), to: to.toISOString() },
+      });
+    },
+    enabled: isAdmin,
+    staleTime: 60_000,
+  });
 
   const recentQuery = useQuery({
     queryKey: ["admin-recent-properties"],
@@ -59,7 +73,7 @@ function Dashboard() {
   const cards = [
     { label: "Общо имоти", value: stats?.total, icon: Home },
     { label: "Публикувани", value: stats?.active, icon: CheckCircle2 },
-    { label: "Чернови", value: stats?.drafts, icon: Settings },
+    { label: "Непубликувани", value: stats?.drafts, icon: Settings },
     { label: "Продадени", value: stats?.sold, icon: TrendingUp },
     { label: "Под наем", value: stats?.rent, icon: KeyRound },
     { label: "Нови запитвания", value: stats?.newInquiries, icon: MessageSquare },
@@ -67,9 +81,7 @@ function Dashboard() {
 
   return (
     <div className="space-y-7">
-      <section className="relative isolate overflow-hidden rounded-[1.75rem] bg-[#10213b] px-6 py-7 text-white shadow-xl shadow-navy/10 sm:px-9 sm:py-9">
-        <div className="pointer-events-none absolute -right-10 -top-24 -z-10 h-64 w-64 rounded-full border border-white/10" />
-        <div className="pointer-events-none absolute -right-1 -top-16 -z-10 h-48 w-48 rounded-full border border-gold/20" />
+      <section className="rounded-2xl bg-[#10213b] px-6 py-7 text-white sm:px-9 sm:py-9">
         <div className="flex flex-wrap items-end justify-between gap-6">
           <div className="max-w-2xl">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.16em] text-gold">
@@ -128,6 +140,52 @@ function Dashboard() {
           </Card>
         ))}
       </section>
+
+      {isAdmin && (
+        <section className="grid gap-5 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 sm:p-6 lg:grid-cols-[minmax(0,1.3fr)_auto] lg:items-center">
+          <div>
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-amber-700">
+              <ShieldAlert className="h-4 w-4" aria-hidden="true" />
+              Security operations · last 24 hours
+            </div>
+            {securityQuery.isError ? (
+              <div
+                role="alert"
+                className="mt-3 flex flex-wrap items-center gap-3 text-sm text-rose-900"
+              >
+                Security analytics are unavailable; no estimated values are shown.
+                <Button variant="outline" size="sm" onClick={() => void securityQuery.refetch()}>
+                  Retry
+                </Button>
+              </div>
+            ) : (
+              <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                {[
+                  ["Event episodes", securityQuery.data?.totalEvents],
+                  ["High-risk sources", securityQuery.data?.highRiskVisitors],
+                  ["Critical", securityQuery.data?.criticalEvents],
+                  ["Active restrictions", securityQuery.data?.activeRestrictions],
+                ].map(([label, value]) => (
+                  <div
+                    key={label}
+                    className="border-l border-slate-200 pl-3 first:border-0 first:pl-0"
+                  >
+                    <p className="text-xl font-semibold tabular-nums text-navy">
+                      {securityQuery.isLoading ? "…" : (value ?? "—")}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">{label}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <Button asChild variant="outline" className="min-h-11">
+            <Link to="/admin/security">
+              Review security events <ArrowUpRight className="ml-2 h-4 w-4" aria-hidden="true" />
+            </Link>
+          </Button>
+        </section>
+      )}
 
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(18rem,0.8fr)]">
         <Card className="order-2 min-w-0 border border-slate-200/80 bg-white shadow-sm xl:order-1">

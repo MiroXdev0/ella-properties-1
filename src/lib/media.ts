@@ -3,19 +3,52 @@ export function mediaUrl(storagePath: string) {
   return `/api/public/media/${storagePath.split("/").map(encodeURIComponent).join("/")}`;
 }
 
+export function mediaUrlAtWidth(value: string, width: 320 | 480 | 640 | 960 | 1280) {
+  if (!value.startsWith("/api/public/media/")) return value;
+  const [path, query] = value.split("?", 2);
+  const params = new URLSearchParams(query);
+  params.set("w", String(width));
+  return `${path}?${params.toString()}`;
+}
+
+export function storagePathFromMediaUrl(value: string): string | null {
+  const marker = "/api/public/media/";
+  const start = value.indexOf(marker);
+  if (start < 0) return null;
+  try {
+    return value
+      .slice(start + marker.length)
+      .split(/[?#]/, 1)[0]
+      .split("/")
+      .map((part) => decodeURIComponent(part))
+      .join("/");
+  } catch {
+    return null;
+  }
+}
+
 /** Safe file extension derived from the file name or its MIME type. */
 export function fileExt(file: File) {
   const fromName = file.name.includes(".") ? file.name.split(".").pop()! : "";
-  const clean = fromName.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8);
+  const clean = fromName
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .slice(0, 8);
   if (clean) return clean;
-  const fromType = file.type.split("/")[1]?.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const fromType = file.type
+    .split("/")[1]
+    ?.toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
   return fromType || "bin";
 }
 
 export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 
 export function isImageFile(file: File) {
-  return file.type.startsWith("image/") || /\.(jpe?g|png|webp|gif|avif|bmp|tiff?|svg|heic|heif|jfif|ico)$/i.test(file.name);
+  return (
+    file.type.startsWith("image/") ||
+    /\.(jpe?g|png|webp|gif|avif|bmp|tiff?|svg|heic|heif|jfif|ico)$/i.test(file.name)
+  );
 }
 
 export function isVideoFile(file: File) {
@@ -35,9 +68,3 @@ export function embedUrl(url: string): string | null {
   if (vm) return `https://player.vimeo.com/video/${vm[1]}`;
   return null;
 }
-
-
-
-
-
-

@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { preferredErrorLanguage, renderErrorPage } from "@/lib/error-page";
+import { resolveHoneypotEnforcementMode } from "@/lib/honeypot/restriction-policy";
 
 const ipSchema = z.string().ip();
 const ruleSchema = z.object({
@@ -242,6 +244,7 @@ export function createHoneypotRestrictionGuard(
   isRestricted: (ipAddress: string) => Promise<boolean>,
 ): (request: Request) => Promise<Response | null> {
   return async (request) => {
+    const enforcementMode = resolveHoneypotEnforcementMode(process.env.HONEYPOT_ENFORCEMENT_MODE);
     const zoneHostname = process.env.CLOUDFLARE_ZONE_HOSTNAME?.trim().toLowerCase();
     const requestHostname = new URL(request.url).hostname.toLowerCase().replace(/\.$/, "");
     const zoneHostnameIsValid =
@@ -253,6 +256,7 @@ export function createHoneypotRestrictionGuard(
       zoneHostname !== "pages.dev" &&
       !zoneHostname.endsWith(".pages.dev");
     if (
+      enforcementMode === "cloudflare_zone" &&
       zoneHostnameIsValid &&
       (requestHostname === zoneHostname || requestHostname.endsWith(`.${zoneHostname}`))
     ) {
@@ -267,22 +271,46 @@ export function createHoneypotRestrictionGuard(
       if (!(await isRestricted(ipAddress))) return null;
     } catch (error) {
       console.error("[honeypot] Request enforcement lookup failed", error);
-      return new Response("Temporarily unable to verify access", {
-        status: 503,
-        headers: {
-          "content-type": "text/plain; charset=utf-8",
-          "cache-control": "no-store",
+      const wantsHtml = request.headers.get("accept")?.includes("text/html") ?? false;
+      const url = new URL(request.url);
+      const retryHref =
+        request.method === "GET" || request.method === "HEAD"
+          ? url.pathname + url.search
+          : undefined;
+      return new Response(
+        wantsHtml
+          ? renderErrorPage({
+              kind: "connection",
+              language: preferredErrorLanguage(request),
+              retryHref,
+            })
+          : "Temporarily unable to verify access",
+        {
+          status: 503,
+          headers: {
+            "content-type": wantsHtml ? "text/html; charset=utf-8" : "text/plain; charset=utf-8",
+            "cache-control": "no-store",
+          },
         },
-      });
+      );
     }
 
-    return new Response("Access restricted", {
-      status: 403,
-      headers: {
-        "content-type": "text/plain; charset=utf-8",
-        "cache-control": "no-store",
+    const wantsHtml = request.headers.get("accept")?.includes("text/html") ?? false;
+    return new Response(
+      wantsHtml
+        ? renderErrorPage({
+            kind: "access",
+            language: preferredErrorLanguage(request),
+          })
+        : "Access restricted",
+      {
+        status: 403,
+        headers: {
+          "content-type": wantsHtml ? "text/html; charset=utf-8" : "text/plain; charset=utf-8",
+          "cache-control": "no-store",
+        },
       },
-    });
+    );
   };
 }
 
@@ -350,11 +378,11 @@ export async function removeCloudflareRestriction(
   }
 }
 
-export async function expireCloudflareRestrictions(): Promise<void> {
+export async function expireHoneypotRestrictions(): Promise<void> {
   const now = new Date().toISOString();
   const { data: expired, error: expiredError } = await supabaseAdmin
     .from("honeypot_ip_restrictions")
-    .select("id, visitor_id, ip_address, cloudflare_rule_id, expires_at, status")
+    .select("id, visitor_id, ip_address, cloudflare_rule_id, expires_at, status, enforcement_mode")
     .eq("status", "active")
     .not("expires_at", "is", null)
     .lte("expires_at", now)
@@ -364,7 +392,7 @@ export async function expireCloudflareRestrictions(): Promise<void> {
 
   const { data: pending, error: pendingError } = await supabaseAdmin
     .from("honeypot_ip_restrictions")
-    .select("id, visitor_id, ip_address, cloudflare_rule_id, expires_at, status")
+    .select("id, visitor_id, ip_address, cloudflare_rule_id, expires_at, status, enforcement_mode")
     .in("status", ["pending", "pending_removal"])
     .not("cloudflare_rule_id", "is", null)
     .order("updated_at", { ascending: true })
@@ -377,6 +405,42 @@ export async function expireCloudflareRestrictions(): Promise<void> {
 
   for (const restriction of restrictions.values()) {
     const isExpired = restriction.expires_at !== null && restriction.expires_at <= now;
+    if (restriction.enforcement_mode === "worker_only" && restriction.status === "active") {
+      const { data: released, error: releaseError } = await supabaseAdmin
+        .from("honeypot_ip_restrictions")
+        .update({ status: "expired", released_at: now, updated_at: now })
+        .eq("id", restriction.id)
+        .eq("status", "active")
+        .lte("expires_at", now)
+        .select("id")
+        .maybeSingle();
+      if (releaseError || !released) {
+        if (releaseError) console.error("[honeypot] Worker restriction expiration failed");
+        continue;
+      }
+
+      if (restriction.visitor_id) {
+        const { error: eventError } = await supabaseAdmin
+          .from("honeypot_events")
+          .update({ status: "confirmed_suspicious" })
+          .eq("visitor_id", restriction.visitor_id)
+          .eq("status", "restricted");
+        if (eventError)
+          console.error("[honeypot] Unable to refresh event statuses after restriction expiry");
+      }
+
+      const { error: auditError } = await supabaseAdmin.from("honeypot_admin_audit").insert({
+        visitor_id: restriction.visitor_id,
+        restriction_id: restriction.id,
+        administrator_id: null,
+        action: "restriction_expired",
+        outcome: "success",
+        details: { automated: true, enforcement_mode: "worker_only" },
+      });
+      if (auditError) console.error("[honeypot] Worker restriction expiration audit failed");
+      continue;
+    }
+
     if (restriction.status === "active" || restriction.status === "pending") {
       const { error } = await supabaseAdmin
         .from("honeypot_ip_restrictions")

@@ -1,10 +1,14 @@
 import { consumeLastCapturedError } from "./lib/error-capture";
-import { renderErrorPage } from "./lib/error-page";
+import { preferredErrorLanguage, renderErrorPage } from "./lib/error-page";
 import { handleHoneypotRequest, runHoneypotRetention } from "./lib/honeypot/detection.server";
 import {
   enforceHoneypotRestriction,
-  expireCloudflareRestrictions,
+  expireHoneypotRestrictions,
 } from "./lib/honeypot/cloudflare.server";
+import {
+  queueSecurityRequestMonitoring,
+  runSecurityMonitoringRetention,
+} from "./lib/security-monitoring.server";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -23,7 +27,10 @@ async function getServerEntry(): Promise<ServerEntry> {
 
 // h3 swallows in-handler throws into a normal 500 Response with body
 // {"unhandled":true,"message":"HTTPError"} — try/catch alone never fires for those.
-async function normalizeCatastrophicSsrResponse(response: Response): Promise<Response> {
+async function normalizeCatastrophicSsrResponse(
+  request: Request,
+  response: Response,
+): Promise<Response> {
   if (response.status < 500) return response;
   const contentType = response.headers.get("content-type") ?? "";
   if (!contentType.includes("application/json")) return response;
@@ -34,10 +41,20 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
   }
 
   console.error(consumeLastCapturedError() ?? new Error(`h3 swallowed SSR error: ${body}`));
-  return new Response(renderErrorPage(), {
-    status: 500,
-    headers: { "content-type": "text/html; charset=utf-8" },
-  });
+  const retryHref =
+    request.method === "GET" || request.method === "HEAD"
+      ? new URL(request.url).pathname + new URL(request.url).search
+      : undefined;
+  return new Response(
+    renderErrorPage({
+      language: preferredErrorLanguage(request),
+      retryHref,
+    }),
+    {
+      status: 500,
+      headers: { "content-type": "text/html; charset=utf-8" },
+    },
+  );
 }
 
 // Uploads go straight to storage, so app requests (server functions, forms) never need large bodies.
@@ -74,24 +91,42 @@ export default {
 
       const len = Number(request.headers.get("content-length") ?? 0);
       if (request.method !== "GET" && request.method !== "HEAD" && len > MAX_BODY_BYTES) {
-        return withSecurityHeaders(new Response("Payload too large", { status: 413 }));
+        const response = withSecurityHeaders(new Response("Payload too large", { status: 413 }));
+        queueSecurityRequestMonitoring(request, response, ctx);
+        return response;
       }
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return withSecurityHeaders(await normalizeCatastrophicSsrResponse(response));
+      const finalResponse = withSecurityHeaders(
+        await normalizeCatastrophicSsrResponse(request, response),
+      );
+      queueSecurityRequestMonitoring(request, finalResponse, ctx);
+      return finalResponse;
     } catch (error) {
       console.error(error);
-      return withSecurityHeaders(
-        new Response(renderErrorPage(), {
-          status: 500,
-          headers: { "content-type": "text/html; charset=utf-8" },
-        }),
+      const retryHref =
+        request.method === "GET" || request.method === "HEAD"
+          ? new URL(request.url).pathname + new URL(request.url).search
+          : undefined;
+      const response = withSecurityHeaders(
+        new Response(
+          renderErrorPage({
+            language: preferredErrorLanguage(request),
+            retryHref,
+          }),
+          {
+            status: 500,
+            headers: { "content-type": "text/html; charset=utf-8" },
+          },
+        ),
       );
+      queueSecurityRequestMonitoring(request, response, ctx);
+      return response;
     }
   },
   async scheduled() {
     try {
-      await expireCloudflareRestrictions();
+      await expireHoneypotRestrictions();
     } catch (error) {
       console.error("[honeypot] Scheduled IP restriction expiry failed", error);
     }
@@ -100,6 +135,12 @@ export default {
       await runHoneypotRetention();
     } catch (error) {
       console.error("[honeypot] Scheduled retention cleanup failed", error);
+    }
+
+    try {
+      await runSecurityMonitoringRetention();
+    } catch (error) {
+      console.error("[security-monitor] Scheduled retention cleanup failed", error);
     }
   },
 };

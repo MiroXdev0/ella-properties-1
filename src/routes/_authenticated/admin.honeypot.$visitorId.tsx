@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -37,7 +37,9 @@ import {
   updateHoneypotEventStatus,
   verifyHoneypotRestriction,
 } from "@/lib/admin/honeypot.functions";
+import { updateSecurityVisitorStatus } from "@/lib/admin/security.functions";
 import type { Json } from "@/integrations/supabase/types";
+import { SECURITY_SIGNAL_INFO, type SecuritySignalCode } from "@/lib/security-monitoring";
 
 export const Route = createFileRoute("/_authenticated/admin/honeypot/$visitorId")({
   head: () => ({
@@ -67,7 +69,7 @@ const statusClass: Record<string, string> = {
 const restrictionStatusLabels: Record<string, string> = {
   pending: "Pending",
   pending_removal: "Pending removal",
-  active: "Active · last verified",
+  active: "Active",
   failed: "Failed",
   expired: "Expired",
   unbanned: "Removed",
@@ -120,12 +122,13 @@ function actionLabel(action: string): string {
     event_status_changed: "Event status changed",
     note_added: "Investigation note added",
     restriction_requested: "IP restriction requested",
-    restriction_activated: "Cloudflare restriction verified",
-    restriction_failed: "Cloudflare restriction failed",
+    restriction_activated: "IP restriction activated",
+    restriction_failed: "IP restriction failed",
     restriction_removal_requested: "Restriction removal requested",
-    restriction_removal_failed: "Cloudflare restriction removal failed",
-    restriction_removed: "Cloudflare restriction removed",
+    restriction_removal_failed: "IP restriction removal failed",
+    restriction_removed: "IP restriction removed",
     restriction_expired: "Temporary restriction expired",
+    visitor_review_status_changed: "Visitor review status changed",
   };
   return labels[action] ?? action;
 }
@@ -143,7 +146,7 @@ type TimelineEntry = {
   at: string;
   title: string;
   description: string;
-  kind: "request" | "note" | "admin";
+  kind: "request" | "note" | "admin" | "security";
   eventId?: string;
   eventStatus?: string;
 };
@@ -192,6 +195,12 @@ function HoneypotInvestigation() {
     onSuccess: invalidateVisitor,
     onError: (error) => setActionError(error.message),
   });
+  const visitorStatusMutation = useMutation({
+    mutationFn: (status: "new" | "investigating" | "cleared") =>
+      updateSecurityVisitorStatus({ data: { visitorId, status } }),
+    onSuccess: invalidateVisitor,
+    onError: (error) => setActionError(error.message),
+  });
   const unbanMutation = useMutation({
     mutationFn: (restrictionId: string) =>
       unrestrictHoneypotVisitor({
@@ -214,8 +223,6 @@ function HoneypotInvestigation() {
     onError: (error) => setActionError(error.message),
   });
 
-  if (!isAdmin) return <Navigate to="/admin" />;
-
   const record = investigationQuery.data;
   const visitor = record?.visitor;
   const restrictions = record?.restrictions ?? [];
@@ -226,7 +233,17 @@ function HoneypotInvestigation() {
   const hasLiveRestriction = Boolean(currentRestriction || pendingRestriction);
   const eventCount = record?.activityTotal ?? 0;
   const pageSize = record?.activityPageSize ?? 100;
-  const totalPages = Math.max(1, Math.ceil(eventCount / pageSize));
+  const totalPages = record?.timelineTotalPages ?? Math.max(1, Math.ceil(eventCount / pageSize));
+  const timelineTotalEntries = record?.timelineTotalEntries ?? eventCount;
+  useEffect(() => {
+    if (activityPage > totalPages) setActivityPage(totalPages);
+  }, [activityPage, totalPages]);
+  if (!isAdmin) return <Navigate to="/admin" />;
+
+  const currentRiskScore = Math.max(
+    0,
+    ...(record?.securityActivity ?? []).map((item) => item.risk_score),
+  );
 
   const timeline: TimelineEntry[] = [
     ...(record?.activity ?? []).map((item): TimelineEntry => ({
@@ -238,6 +255,21 @@ function HoneypotInvestigation() {
       eventId: item.event.id,
       eventStatus: item.event.status,
     })),
+    ...(record?.securityActivity ?? []).map((item): TimelineEntry => {
+      const signals = Array.isArray(item.signals)
+        ? item.signals.filter(
+            (signal): signal is SecuritySignalCode =>
+              typeof signal === "string" && Object.hasOwn(SECURITY_SIGNAL_INFO, signal),
+          )
+        : [];
+      return {
+        id: `security-${item.id}`,
+        at: item.last_seen,
+        title: `Automated security signal · ${item.severity}`,
+        description: `${item.request_method} ${item.route} · HTTP ${item.http_status} · ${item.observed_requests === 120 ? "≥120" : item.observed_requests} source request samples · risk ${item.risk_score} · ${signals.map((signal) => SECURITY_SIGNAL_INFO[signal].label).join(", ")} · unverified assessment`,
+        kind: "security",
+      };
+    }),
     ...(record?.notes ?? []).map((item): TimelineEntry => ({
       id: `note-${item.id}`,
       at: item.created_at,
@@ -252,6 +284,13 @@ function HoneypotInvestigation() {
       description: detailsText(item.details) || `Outcome: ${item.outcome}`,
       kind: "admin",
       eventId: item.event_id ?? undefined,
+    })),
+    ...(record?.securityAudit ?? []).map((item): TimelineEntry => ({
+      id: `security-audit-${item.id}`,
+      at: item.created_at,
+      title: "Visitor review status changed",
+      description: `${item.previous_status ?? "new"} → ${item.new_status}`,
+      kind: "admin",
     })),
   ].sort((a, b) => b.at.localeCompare(a.at));
 
@@ -348,11 +387,36 @@ function HoneypotInvestigation() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
+              <label className="grid gap-1 text-[11px] font-medium text-white/70">
+                Visitor review
+                <select
+                  className="min-h-11 rounded-lg border border-white/20 bg-white/10 px-3 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+                  value={visitor.review_status}
+                  disabled={visitorStatusMutation.isPending}
+                  onChange={(event) =>
+                    visitorStatusMutation.mutate(
+                      event.currentTarget.value as "new" | "investigating" | "cleared",
+                    )
+                  }
+                >
+                  <option className="text-slate-900" value="new">
+                    New
+                  </option>
+                  <option className="text-slate-900" value="investigating">
+                    Investigating
+                  </option>
+                  <option className="text-slate-900" value="cleared">
+                    Cleared
+                  </option>
+                </select>
+              </label>
               {!hasLiveRestriction && (
                 <HoneypotRestrictionDialog
                   visitorId={visitor.id}
                   ipAddress={visitor.ip_address}
                   isTrusted={visitor.is_trusted}
+                  enforcementMode={record.enforcementMode}
+                  disabled={!record.enforcementConfigured}
                 />
               )}
               {currentRestriction && (
@@ -371,6 +435,11 @@ function HoneypotInvestigation() {
               )}
             </div>
           </header>
+          <p className="text-xs text-slate-500">
+            Visitor review state is administrative triage only; it does not change trusted-IP
+            safeguards or IP enforcement.
+            {visitor.reviewed_at ? ` Last updated ${formatDate(visitor.reviewed_at)}.` : ""}
+          </p>
 
           {pendingRestriction && (
             <div
@@ -379,8 +448,8 @@ function HoneypotInvestigation() {
             >
               <Clock3 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
               <p>
-                A Cloudflare restriction operation is pending. The enforcement status is not shown
-                as active until Cloudflare confirms it.
+                A Cloudflare zone restriction is pending. It is not shown as active until Cloudflare
+                confirms the edge rule.
               </p>
             </div>
           )}
@@ -391,7 +460,7 @@ function HoneypotInvestigation() {
             >
               Source metadata was purged on {formatDate(visitor.identity_purged_at)} under the
               90-day retention policy. The restriction record retains only the IP address needed to
-              administer the active Cloudflare rule.
+              administer the active restriction.
             </div>
           )}
           {actionError && (
@@ -400,6 +469,15 @@ function HoneypotInvestigation() {
               className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-950"
             >
               {actionError}
+            </div>
+          )}
+          {record?.securityActivityError && (
+            <div
+              role="alert"
+              className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950"
+            >
+              Site-wide security activity could not be loaded. Honeypot activity and enforcement
+              details remain available.
             </div>
           )}
 
@@ -414,7 +492,7 @@ function HoneypotInvestigation() {
                     Activity timeline
                   </h2>
                   <p className="mt-1 text-xs text-slate-600">
-                    Newest first · {eventCount.toLocaleString()} recorded requests
+                    Newest first · {timelineTotalEntries.toLocaleString()} recorded timeline entries
                   </p>
                 </div>
                 <span className="text-xs tabular-nums text-slate-500">
@@ -431,10 +509,12 @@ function HoneypotInvestigation() {
                   {timeline.map((item) => (
                     <li key={item.id} className="flex gap-3 px-5 py-4 sm:px-6">
                       <span
-                        className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg ${item.kind === "request" ? "bg-amber-50 text-amber-800" : item.kind === "note" ? "bg-sky-50 text-sky-800" : "bg-slate-100 text-slate-700"}`}
+                        className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg ${item.kind === "request" ? "bg-amber-50 text-amber-800" : item.kind === "security" ? "bg-rose-50 text-rose-800" : item.kind === "note" ? "bg-sky-50 text-sky-800" : "bg-slate-100 text-slate-700"}`}
                       >
                         {item.kind === "request" ? (
                           <Globe2 className="h-4 w-4" aria-hidden="true" />
+                        ) : item.kind === "security" ? (
+                          <ShieldAlert className="h-4 w-4" aria-hidden="true" />
                         ) : item.kind === "note" ? (
                           <MessageSquareText className="h-4 w-4" aria-hidden="true" />
                         ) : (
@@ -494,9 +574,9 @@ function HoneypotInvestigation() {
 
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-5 py-3 sm:px-6">
                 <span className="text-xs tabular-nums text-slate-600">
-                  {eventCount === 0
-                    ? "No requests"
-                    : `Requests ${(activityPage - 1) * pageSize + 1}–${Math.min(activityPage * pageSize, eventCount)} of ${eventCount}`}
+                  {timelineTotalEntries === 0
+                    ? "No activity"
+                    : `${timeline.length} entries shown on this page · ${timelineTotalEntries.toLocaleString()} total`}
                 </span>
                 <div className="flex gap-2">
                   <Button
@@ -577,10 +657,16 @@ function HoneypotInvestigation() {
                       {requestsPerHour ? `${requestsPerHour}/h` : "—"}
                     </dd>
                   </div>
+                  <div>
+                    <dt className="text-xs text-slate-500">Highest recent risk assessment</dt>
+                    <dd className="mt-1 text-xl font-semibold tabular-nums text-navy">
+                      {currentRiskScore ? `${currentRiskScore} / 100` : "Unavailable"}
+                    </dd>
+                  </div>
                 </dl>
                 <p className="mt-3 text-xs leading-relaxed text-slate-500">
-                  Average is based on the time between first and last detection, not a maliciousness
-                  score.
+                  Request average is based on first/last detection. Risk is the highest retained
+                  automated assessment; neither alone confirms malicious behavior.
                 </p>
                 <div className="mt-4 border-t border-slate-100 pt-4">
                   <div className="text-xs font-medium text-slate-500">User-Agent</div>
@@ -630,7 +716,18 @@ function HoneypotInvestigation() {
                         </p>
                         {restriction.status === "active" && (
                           <p className="mt-1 text-xs text-slate-500">
-                            Cloudflare last confirmed {formatDate(restriction.updated_at)}
+                            {restriction.enforcement_mode === "worker_only"
+                              ? "Worker status last checked"
+                              : "Cloudflare rule last verified"}{" "}
+                            {formatDate(restriction.last_verified_at)}
+                          </p>
+                        )}
+                        {restriction.status === "active" && (
+                          <p className="mt-1 text-xs text-slate-600">
+                            Enforcement:{" "}
+                            {restriction.enforcement_mode === "worker_only"
+                              ? "Worker-only; applies to requests reaching this Worker"
+                              : "Cloudflare zone rule"}
                           </p>
                         )}
                         <p className="mt-2 text-xs text-slate-500">
@@ -665,7 +762,9 @@ function HoneypotInvestigation() {
                                 ) : (
                                   <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
                                 )}
-                                Verify enforcement
+                                {restriction.enforcement_mode === "worker_only"
+                                  ? "Check Worker status"
+                                  : "Verify Cloudflare rule"}
                               </Button>
                               <Button
                                 variant="outline"
@@ -686,10 +785,15 @@ function HoneypotInvestigation() {
                                 className={`mt-2 text-sm ${verificationResults[restriction.id].verified ? "text-emerald-800" : "text-rose-800"}`}
                               >
                                 {verificationResults[restriction.id].verified
-                                  ? "Cloudflare confirms a block rule for this IP in the configured zone. The Worker also enforces restrictions on workers.dev."
+                                  ? verificationResults[restriction.id].reason === "worker_enforced"
+                                    ? "The active Worker restriction record is present. Requests reaching this Worker are checked against it; this does not block traffic that bypasses the Worker."
+                                    : "Cloudflare confirms a block rule for this IP in the configured zone."
                                   : verificationResults[restriction.id].reason === "missing"
                                     ? "Cloudflare no longer has the expected rule. This restriction was marked failed."
-                                    : "Cloudflare's rule does not match the expected IP, action, or restriction record. This restriction was marked failed."}
+                                    : verificationResults[restriction.id].reason ===
+                                        "worker_mode_not_configured"
+                                      ? "Worker-only enforcement is not enabled in the current deployment configuration."
+                                      : "Cloudflare's rule does not match the expected IP, action, or restriction record. This restriction was marked failed."}
                               </p>
                             )}
                           </>
@@ -780,8 +884,12 @@ function HoneypotInvestigation() {
           <AlertDialogHeader>
             <AlertDialogTitle>Remove this IP restriction?</AlertDialogTitle>
             <AlertDialogDescription>
-              The Cloudflare rule will be deleted and verified before the restriction is marked as
-              removed. Other independent Cloudflare rules may still apply.
+              {investigationQuery.data?.restrictions.find(
+                (restriction) => restriction.id === unbanRestrictionId,
+              )?.enforcement_mode === "worker_only"
+                ? "The Worker restriction record will be deactivated. This affects requests reaching this Worker only."
+                : "The Cloudflare rule will be deleted and verified before the restriction is marked as removed."}{" "}
+              Other independent Cloudflare rules may still apply.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

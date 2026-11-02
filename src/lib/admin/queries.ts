@@ -121,8 +121,7 @@ export type SettingsRow = {
 };
 
 export async function fetchStats() {
-  const [total, active, drafts, sold, rent, inquiries] = await Promise.all([
-    supabase.from("properties").select("id", { count: "exact", head: true }),
+  const [active, drafts, sold, rent, inquiries] = await Promise.all([
     supabase
       .from("properties")
       .select("id", { count: "exact", head: true })
@@ -142,17 +141,31 @@ export async function fetchStats() {
     supabase.from("inquiries").select("id", { count: "exact", head: true }).eq("status", "Ново"),
   ]);
 
-  const failedQuery = [total, active, drafts, sold, rent, inquiries].find((result) => result.error);
+  const failedQuery = [active, drafts, sold, rent, inquiries].find((result) => result.error);
   if (failedQuery?.error) {
     throw new Error(`Неуспешно зареждане на статистиката: ${failedQuery.error.message}`);
   }
+  const activeCount = active.count;
+  const draftCount = drafts.count;
+  const soldCount = sold.count;
+  const rentCount = rent.count;
+  const newInquiryCount = inquiries.count;
+  if (
+    activeCount == null ||
+    draftCount == null ||
+    soldCount == null ||
+    rentCount == null ||
+    newInquiryCount == null
+  ) {
+    throw new Error("Неуспешно зареждане на статистиката: липсват потвърдени броеве.");
+  }
 
   return {
-    total: total.count ?? 0,
-    active: active.count ?? 0,
-    drafts: drafts.count ?? 0,
-    sold: sold.count ?? 0,
-    rent: rent.count ?? 0,
-    newInquiries: inquiries.count ?? 0,
+    total: activeCount + draftCount,
+    active: activeCount,
+    drafts: draftCount,
+    sold: soldCount,
+    rent: rentCount,
+    newInquiries: newInquiryCount,
   };
 }

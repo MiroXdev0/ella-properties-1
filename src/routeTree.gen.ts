@@ -27,10 +27,14 @@ import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authentic
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin.users'
 import { Route as AuthenticatedAdminTeamRouteImport } from './routes/_authenticated/admin.team'
 import { Route as AuthenticatedAdminSettingsRouteImport } from './routes/_authenticated/admin.settings'
+import { Route as AuthenticatedAdminSecurityHealthRouteImport } from './routes/_authenticated/admin.security-health'
+import { Route as AuthenticatedAdminSecurityRouteImport } from './routes/_authenticated/admin.security'
+import { Route as AuthenticatedAdminRestrictionsRouteImport } from './routes/_authenticated/admin.restrictions'
 import { Route as AuthenticatedAdminPropertiesRouteImport } from './routes/_authenticated/admin.properties'
 import { Route as AuthenticatedAdminPagesRouteImport } from './routes/_authenticated/admin.pages'
 import { Route as AuthenticatedAdminInquiriesRouteImport } from './routes/_authenticated/admin.inquiries'
 import { Route as AuthenticatedAdminHoneypotRouteImport } from './routes/_authenticated/admin.honeypot'
+import { Route as AuthenticatedAdminAuditRouteImport } from './routes/_authenticated/admin.audit'
 import { Route as ApiPublicMediaSplatRouteImport } from './routes/api/public/media.$'
 import { Route as AuthenticatedAdminHoneypotVisitorIdRouteImport } from './routes/_authenticated/admin.honeypot.$visitorId'
 
@@ -124,6 +128,24 @@ const AuthenticatedAdminSettingsRoute =
     path: '/settings',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminSecurityHealthRoute =
+  AuthenticatedAdminSecurityHealthRouteImport.update({
+    id: '/security-health',
+    path: '/security-health',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminSecurityRoute =
+  AuthenticatedAdminSecurityRouteImport.update({
+    id: '/security',
+    path: '/security',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminRestrictionsRoute =
+  AuthenticatedAdminRestrictionsRouteImport.update({
+    id: '/restrictions',
+    path: '/restrictions',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminPropertiesRoute =
   AuthenticatedAdminPropertiesRouteImport.update({
     id: '/properties',
@@ -147,6 +169,11 @@ const AuthenticatedAdminHoneypotRoute =
     path: '/honeypot',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminAuditRoute = AuthenticatedAdminAuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
 const ApiPublicMediaSplatRoute = ApiPublicMediaSplatRouteImport.update({
   id: '/api/public/media/$',
   path: '/api/public/media/$',
@@ -173,10 +200,14 @@ export interface FileRoutesByFullPath {
   '/imoti-v/$slug': typeof ImotiVSlugRoute
   '/pages/$slug': typeof PagesSlugRoute
   '/properties/$id': typeof PropertiesIdRoute
+  '/admin/audit': typeof AuthenticatedAdminAuditRoute
   '/admin/honeypot': typeof AuthenticatedAdminHoneypotRouteWithChildren
   '/admin/inquiries': typeof AuthenticatedAdminInquiriesRoute
   '/admin/pages': typeof AuthenticatedAdminPagesRoute
   '/admin/properties': typeof AuthenticatedAdminPropertiesRoute
+  '/admin/restrictions': typeof AuthenticatedAdminRestrictionsRoute
+  '/admin/security': typeof AuthenticatedAdminSecurityRoute
+  '/admin/security-health': typeof AuthenticatedAdminSecurityHealthRoute
   '/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/admin/team': typeof AuthenticatedAdminTeamRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
@@ -197,10 +228,14 @@ export interface FileRoutesByTo {
   '/imoti-v/$slug': typeof ImotiVSlugRoute
   '/pages/$slug': typeof PagesSlugRoute
   '/properties/$id': typeof PropertiesIdRoute
+  '/admin/audit': typeof AuthenticatedAdminAuditRoute
   '/admin/honeypot': typeof AuthenticatedAdminHoneypotRouteWithChildren
   '/admin/inquiries': typeof AuthenticatedAdminInquiriesRoute
   '/admin/pages': typeof AuthenticatedAdminPagesRoute
   '/admin/properties': typeof AuthenticatedAdminPropertiesRoute
+  '/admin/restrictions': typeof AuthenticatedAdminRestrictionsRoute
+  '/admin/security': typeof AuthenticatedAdminSecurityRoute
+  '/admin/security-health': typeof AuthenticatedAdminSecurityHealthRoute
   '/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/admin/team': typeof AuthenticatedAdminTeamRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
@@ -224,10 +259,14 @@ export interface FileRoutesById {
   '/imoti-v/$slug': typeof ImotiVSlugRoute
   '/pages/$slug': typeof PagesSlugRoute
   '/properties/$id': typeof PropertiesIdRoute
+  '/_authenticated/admin/audit': typeof AuthenticatedAdminAuditRoute
   '/_authenticated/admin/honeypot': typeof AuthenticatedAdminHoneypotRouteWithChildren
   '/_authenticated/admin/inquiries': typeof AuthenticatedAdminInquiriesRoute
   '/_authenticated/admin/pages': typeof AuthenticatedAdminPagesRoute
   '/_authenticated/admin/properties': typeof AuthenticatedAdminPropertiesRoute
+  '/_authenticated/admin/restrictions': typeof AuthenticatedAdminRestrictionsRoute
+  '/_authenticated/admin/security': typeof AuthenticatedAdminSecurityRoute
+  '/_authenticated/admin/security-health': typeof AuthenticatedAdminSecurityHealthRoute
   '/_authenticated/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/_authenticated/admin/team': typeof AuthenticatedAdminTeamRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
@@ -251,10 +290,14 @@ export interface FileRouteTypes {
     | '/imoti-v/$slug'
     | '/pages/$slug'
     | '/properties/$id'
+    | '/admin/audit'
     | '/admin/honeypot'
     | '/admin/inquiries'
     | '/admin/pages'
     | '/admin/properties'
+    | '/admin/restrictions'
+    | '/admin/security'
+    | '/admin/security-health'
     | '/admin/settings'
     | '/admin/team'
     | '/admin/users'
@@ -275,10 +318,14 @@ export interface FileRouteTypes {
     | '/imoti-v/$slug'
     | '/pages/$slug'
     | '/properties/$id'
+    | '/admin/audit'
     | '/admin/honeypot'
     | '/admin/inquiries'
     | '/admin/pages'
     | '/admin/properties'
+    | '/admin/restrictions'
+    | '/admin/security'
+    | '/admin/security-health'
     | '/admin/settings'
     | '/admin/team'
     | '/admin/users'
@@ -301,10 +348,14 @@ export interface FileRouteTypes {
     | '/imoti-v/$slug'
     | '/pages/$slug'
     | '/properties/$id'
+    | '/_authenticated/admin/audit'
     | '/_authenticated/admin/honeypot'
     | '/_authenticated/admin/inquiries'
     | '/_authenticated/admin/pages'
     | '/_authenticated/admin/properties'
+    | '/_authenticated/admin/restrictions'
+    | '/_authenticated/admin/security'
+    | '/_authenticated/admin/security-health'
     | '/_authenticated/admin/settings'
     | '/_authenticated/admin/team'
     | '/_authenticated/admin/users'
@@ -458,6 +509,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminSettingsRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/security-health': {
+      id: '/_authenticated/admin/security-health'
+      path: '/security-health'
+      fullPath: '/admin/security-health'
+      preLoaderRoute: typeof AuthenticatedAdminSecurityHealthRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/security': {
+      id: '/_authenticated/admin/security'
+      path: '/security'
+      fullPath: '/admin/security'
+      preLoaderRoute: typeof AuthenticatedAdminSecurityRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/restrictions': {
+      id: '/_authenticated/admin/restrictions'
+      path: '/restrictions'
+      fullPath: '/admin/restrictions'
+      preLoaderRoute: typeof AuthenticatedAdminRestrictionsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/properties': {
       id: '/_authenticated/admin/properties'
       path: '/properties'
@@ -484,6 +556,13 @@ declare module '@tanstack/react-router' {
       path: '/honeypot'
       fullPath: '/admin/honeypot'
       preLoaderRoute: typeof AuthenticatedAdminHoneypotRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/audit': {
+      id: '/_authenticated/admin/audit'
+      path: '/audit'
+      fullPath: '/admin/audit'
+      preLoaderRoute: typeof AuthenticatedAdminAuditRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
     '/api/public/media/$': {
@@ -519,10 +598,14 @@ const AuthenticatedAdminHoneypotRouteWithChildren =
   )
 
 interface AuthenticatedAdminRouteChildren {
+  AuthenticatedAdminAuditRoute: typeof AuthenticatedAdminAuditRoute
   AuthenticatedAdminHoneypotRoute: typeof AuthenticatedAdminHoneypotRouteWithChildren
   AuthenticatedAdminInquiriesRoute: typeof AuthenticatedAdminInquiriesRoute
   AuthenticatedAdminPagesRoute: typeof AuthenticatedAdminPagesRoute
   AuthenticatedAdminPropertiesRoute: typeof AuthenticatedAdminPropertiesRoute
+  AuthenticatedAdminRestrictionsRoute: typeof AuthenticatedAdminRestrictionsRoute
+  AuthenticatedAdminSecurityRoute: typeof AuthenticatedAdminSecurityRoute
+  AuthenticatedAdminSecurityHealthRoute: typeof AuthenticatedAdminSecurityHealthRoute
   AuthenticatedAdminSettingsRoute: typeof AuthenticatedAdminSettingsRoute
   AuthenticatedAdminTeamRoute: typeof AuthenticatedAdminTeamRoute
   AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRoute
@@ -530,10 +613,14 @@ interface AuthenticatedAdminRouteChildren {
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
+  AuthenticatedAdminAuditRoute: AuthenticatedAdminAuditRoute,
   AuthenticatedAdminHoneypotRoute: AuthenticatedAdminHoneypotRouteWithChildren,
   AuthenticatedAdminInquiriesRoute: AuthenticatedAdminInquiriesRoute,
   AuthenticatedAdminPagesRoute: AuthenticatedAdminPagesRoute,
   AuthenticatedAdminPropertiesRoute: AuthenticatedAdminPropertiesRoute,
+  AuthenticatedAdminRestrictionsRoute: AuthenticatedAdminRestrictionsRoute,
+  AuthenticatedAdminSecurityRoute: AuthenticatedAdminSecurityRoute,
+  AuthenticatedAdminSecurityHealthRoute: AuthenticatedAdminSecurityHealthRoute,
   AuthenticatedAdminSettingsRoute: AuthenticatedAdminSettingsRoute,
   AuthenticatedAdminTeamRoute: AuthenticatedAdminTeamRoute,
   AuthenticatedAdminUsersRoute: AuthenticatedAdminUsersRoute,

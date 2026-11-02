@@ -6,12 +6,15 @@ import {
   cloudflareFailureMessage,
   createCloudflareRestriction,
   createHoneypotRestrictionGuard,
-  expireCloudflareRestrictions,
+  expireHoneypotRestrictions,
   removeCloudflareRestriction,
   restrictionRequiresWorkerBlock,
   verifyCloudflareRestriction,
 } from "../src/lib/honeypot/cloudflare.server";
-import { getHoneypotRestrictionExpiry } from "../src/lib/honeypot/restriction-policy";
+import {
+  getHoneypotRestrictionExpiry,
+  resolveHoneypotEnforcementMode,
+} from "../src/lib/honeypot/restriction-policy";
 
 const zoneId = "a".repeat(32);
 const ruleId = "b".repeat(32);
@@ -20,6 +23,7 @@ const originalEnvironment = {
   CLOUDFLARE_API_TOKEN: process.env.CLOUDFLARE_API_TOKEN,
   CLOUDFLARE_ZONE_ID: process.env.CLOUDFLARE_ZONE_ID,
   CLOUDFLARE_ZONE_HOSTNAME: process.env.CLOUDFLARE_ZONE_HOSTNAME,
+  HONEYPOT_ENFORCEMENT_MODE: process.env.HONEYPOT_ENFORCEMENT_MODE,
   HONEYPOT_TRUSTED_IPS: process.env.HONEYPOT_TRUSTED_IPS,
   SUPABASE_URL: process.env.SUPABASE_URL,
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -54,6 +58,7 @@ beforeEach(() => {
   process.env.CLOUDFLARE_API_TOKEN = "test-token";
   process.env.CLOUDFLARE_ZONE_ID = zoneId;
   process.env.CLOUDFLARE_ZONE_HOSTNAME = "example.com";
+  process.env.HONEYPOT_ENFORCEMENT_MODE = "cloudflare_zone";
   process.env.HONEYPOT_TRUSTED_IPS = "";
 });
 
@@ -74,8 +79,17 @@ describe("honeypot IP restriction policy", () => {
     expect(getHoneypotRestrictionExpiry("permanent", createdAt)).toBeNull();
   });
 
+  it("uses the documented enforcement mode and rejects unknown modes", () => {
+    expect(resolveHoneypotEnforcementMode(undefined)).toBe("cloudflare_zone");
+    expect(resolveHoneypotEnforcementMode("worker_only")).toBe("worker_only");
+    expect(() => resolveHoneypotEnforcementMode("workers.dev")).toThrow(
+      "HONEYPOT_ENFORCEMENT_MODE must be cloudflare_zone or worker_only",
+    );
+  });
+
   it("blocks active and pending removal rows and pending rows with an external rule", () => {
     expect(restrictionRequiresWorkerBlock("active", ruleId)).toBe(true);
+    expect(restrictionRequiresWorkerBlock("active", null)).toBe(true);
     expect(restrictionRequiresWorkerBlock("pending_removal", ruleId)).toBe(true);
     expect(restrictionRequiresWorkerBlock("pending", ruleId)).toBe(true);
     expect(restrictionRequiresWorkerBlock("pending", null)).toBe(false);
@@ -131,6 +145,22 @@ describe("honeypot IP restriction policy", () => {
     );
     expect(response).toBeNull();
     expect(lookupCount).toBe(0);
+  });
+
+  it("uses Worker enforcement for custom hostnames when worker_only mode is selected", async () => {
+    process.env.HONEYPOT_ENFORCEMENT_MODE = "worker_only";
+    let lookupCount = 0;
+    const guard = createHoneypotRestrictionGuard(async () => {
+      lookupCount += 1;
+      return true;
+    });
+    const response = await guard(
+      new Request("https://app.example.com/", {
+        headers: { "cf-connecting-ip": "203.0.113.10" },
+      }),
+    );
+    expect(response?.status).toBe(403);
+    expect(lookupCount).toBe(1);
   });
 
   it("fails closed with 503 when it cannot check a restriction", async () => {
@@ -219,13 +249,70 @@ describe("Cloudflare IP Access Rules", () => {
       return jsonResponse({ success: false, errors: [{ code: 1000, message: "Not found" }] }, 404);
     });
 
-    await expireCloudflareRestrictions();
+    await expireHoneypotRestrictions();
     expect(restrictionStatuses).toEqual(["pending_removal", "expired"]);
     expect(auditRecords).toHaveLength(1);
     expect(auditRecords[0]).toMatchObject({
       action: "restriction_expired",
       outcome: "success",
       restriction_id: restrictionId,
+    });
+  });
+
+  it("expires worker-only restrictions without calling the Cloudflare API", async () => {
+    const supabaseUrl = "https://supabase-test.invalid";
+    const visitorId = "00000000-0000-4000-8000-000000000011";
+    const restrictionId = "00000000-0000-4000-8000-000000000012";
+    process.env.SUPABASE_URL = supabaseUrl;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role";
+    process.env.HONEYPOT_ENFORCEMENT_MODE = "worker_only";
+
+    const restrictionStatuses: string[] = [];
+    const auditRecords: Array<Record<string, unknown>> = [];
+    setCloudflareFetch(async (input, init) => {
+      const url = new URL(input instanceof Request ? input.url : String(input));
+      if (url.origin !== supabaseUrl) {
+        throw new Error("Worker-only restriction expiry must not call Cloudflare");
+      }
+      if (url.pathname.endsWith("/honeypot_ip_restrictions") && init?.method === "GET") {
+        return url.searchParams.get("status") === "eq.active"
+          ? jsonResponse([
+              {
+                id: restrictionId,
+                visitor_id: visitorId,
+                ip_address: "203.0.113.12",
+                cloudflare_rule_id: null,
+                enforcement_mode: "worker_only",
+                expires_at: new Date(Date.now() - 60_000).toISOString(),
+                status: "active",
+              },
+            ])
+          : jsonResponse([]);
+      }
+      if (url.pathname.endsWith("/honeypot_ip_restrictions") && init?.method === "PATCH") {
+        restrictionStatuses.push(
+          String((JSON.parse(String(init.body)) as { status: string }).status),
+        );
+        return jsonResponse({ id: restrictionId });
+      }
+      if (url.pathname.endsWith("/honeypot_events") && init?.method === "PATCH") {
+        return new Response(null, { status: 204 });
+      }
+      if (url.pathname.endsWith("/honeypot_admin_audit") && init?.method === "POST") {
+        auditRecords.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+        return new Response(null, { status: 201 });
+      }
+      throw new Error(`Unexpected Supabase request: ${init?.method} ${url.pathname}`);
+    });
+
+    await expireHoneypotRestrictions();
+    expect(restrictionStatuses).toEqual(["expired"]);
+    expect(auditRecords).toHaveLength(1);
+    expect(auditRecords[0]).toMatchObject({
+      action: "restriction_expired",
+      outcome: "success",
+      restriction_id: restrictionId,
+      details: { enforcement_mode: "worker_only" },
     });
   });
 

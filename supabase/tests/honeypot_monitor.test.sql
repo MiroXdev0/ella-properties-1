@@ -1,6 +1,6 @@
 begin;
 
-select plan(31);
+select plan(61);
 
 select ok(
   (
@@ -19,6 +19,144 @@ select ok(
       and relforcerowsecurity
   ),
   'all honeypot tables force row-level security'
+);
+
+select ok(
+  (
+    select relrowsecurity and relforcerowsecurity
+    from pg_class
+    where oid = 'public.site_security_events'::regclass
+  ),
+  'site security events force row-level security'
+);
+
+select ok(
+  not exists (
+    select 1
+    from (values
+      ('anon'),
+      ('authenticated')
+    ) as roles(role_name)
+    cross join (values
+      ('SELECT'),
+      ('INSERT'),
+      ('UPDATE'),
+      ('DELETE'),
+      ('TRUNCATE'),
+      ('REFERENCES'),
+      ('TRIGGER')
+    ) as privileges(privilege)
+    where has_table_privilege(
+      roles.role_name,
+      'public.site_security_events',
+      privileges.privilege
+    )
+  ),
+  'public and authenticated clients cannot access site security events'
+);
+
+select ok(
+  has_table_privilege('service_role', 'public.site_security_events', 'SELECT')
+  and has_table_privilege('service_role', 'public.site_security_events', 'INSERT')
+  and has_table_privilege('service_role', 'public.site_security_events', 'UPDATE')
+  and has_table_privilege('service_role', 'public.site_security_events', 'DELETE')
+  and not has_table_privilege('service_role', 'public.site_security_events', 'TRUNCATE'),
+  'service role can operate the monitoring table without truncate'
+);
+
+select ok(
+  (
+    select count(*) = 3 and bool_and(not prosecdef)
+    from pg_proc
+    where pronamespace = 'public'::regnamespace
+      and proname in (
+        'record_site_security_event',
+        'site_security_overview',
+        'purge_site_security_events'
+      )
+  ),
+  'site security RPC functions run as invokers'
+);
+
+select ok(
+  (
+    select count(*) = 3
+    from pg_proc functions
+    where functions.pronamespace = 'public'::regnamespace
+      and functions.proname in (
+        'record_site_security_event',
+        'site_security_overview',
+        'purge_site_security_events'
+      )
+      and has_function_privilege('service_role', functions.oid, 'EXECUTE')
+      and not has_function_privilege('anon', functions.oid, 'EXECUTE')
+      and not has_function_privilege('authenticated', functions.oid, 'EXECUTE')
+  ),
+  'only the service role can execute the site security RPC functions'
+);
+
+select throws_ok(
+  $$
+    select public.record_site_security_event(
+      null, 'abnormal_request_frequency', repeat('a', 64), 200, 30, 'GET', 5,
+      '/', 'low', '["high_request_rate","multi_endpoint_burst"]'::jsonb,
+      repeat('b', 64), to_timestamp(floor(extract(epoch from now()) / 600) * 600),
+      gen_random_uuid()
+    )
+  $$,
+  'P0001',
+  'Invalid security event category',
+  'site security RPC rejects a null category'
+);
+
+select throws_ok(
+  $$
+    select public.record_site_security_event(
+      'traffic', 'abnormal_request_frequency', repeat('c', 64), 200, null, 'GET', 5,
+      '/', 'low', '["high_request_rate","multi_endpoint_burst"]'::jsonb,
+      repeat('d', 64), to_timestamp(floor(extract(epoch from now()) / 600) * 600),
+      gen_random_uuid()
+    )
+  $$,
+  'P0001',
+  'Invalid observed security request count',
+  'site security RPC rejects a null request count'
+);
+
+select throws_ok(
+  $$
+    select public.record_site_security_event(
+      'traffic', 'abnormal_request_frequency', repeat('e', 64), 200, 30, 'GET', 5,
+      '/', 'low', '["unknown_signal"]'::jsonb,
+      repeat('f', 64), to_timestamp(floor(extract(epoch from now()) / 600) * 600),
+      gen_random_uuid()
+    )
+  $$,
+  'P0001',
+  'Invalid security event signals',
+  'site security RPC rejects unknown signal values'
+);
+
+select lives_ok(
+  $$
+    select public.record_site_security_event(
+      'traffic', 'abnormal_request_frequency', repeat('1', 64), 200, 30, 'GET', 5,
+      '/', 'low', '["high_request_rate","multi_endpoint_burst"]'::jsonb,
+      repeat('2', 64), to_timestamp(floor(extract(epoch from now()) / 600) * 600),
+      gen_random_uuid()
+    )
+  $$,
+  'site security RPC accepts valid signals and a bounded observed request count'
+);
+
+select is(
+  (
+    select observed_requests::integer
+    from public.site_security_events
+    where dedupe_key = repeat('1', 64)
+  ),
+  30,
+  'site security RPC stores the observed request sample count'
 );
 
 select ok(
@@ -463,6 +601,295 @@ select is(
   ),
   0,
   'audit rows older than 365 days are removed'
+);
+
+select ok(
+  (
+    select relrowsecurity and relforcerowsecurity
+    from pg_class
+    where oid = 'public.site_security_admin_audit'::regclass
+  ),
+  'site security audit history forces row-level security'
+);
+
+select ok(
+  not exists (
+    select 1
+    from (values ('anon'), ('authenticated')) as roles(role_name)
+    cross join (values ('SELECT'), ('INSERT'), ('UPDATE'), ('DELETE')) as privileges(privilege)
+    where has_table_privilege(
+      roles.role_name,
+      'public.site_security_admin_audit',
+      privileges.privilege
+    )
+  ),
+  'public and authenticated clients cannot access site security audit history'
+);
+
+select ok(
+  has_table_privilege('service_role', 'public.site_security_admin_audit', 'SELECT')
+  and has_table_privilege('service_role', 'public.site_security_admin_audit', 'INSERT')
+  and has_table_privilege('service_role', 'public.site_security_admin_audit', 'DELETE')
+  and not has_table_privilege('service_role', 'public.site_security_admin_audit', 'UPDATE')
+  and not has_table_privilege('service_role', 'public.site_security_admin_audit', 'TRUNCATE'),
+  'service role can append and read audit history without update or truncate access'
+);
+
+select is(
+  (
+    select column_default
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'site_security_events'
+      and column_name = 'review_status'
+  ),
+  '''new''::text',
+  'new security events begin in the new review state'
+);
+
+select ok(
+  (
+    select count(*) = 4 and bool_and(not prosecdef)
+    from pg_proc
+    where pronamespace = 'public'::regnamespace
+      and proname in (
+        'review_site_security_events',
+        'review_site_security_visitor',
+        'site_security_dashboard',
+        'purge_site_security_admin_audit'
+      )
+  ),
+  'security review, dashboard, and audit retention RPCs run as invokers'
+);
+
+select ok(
+  (
+    select count(*) = 4
+    from pg_proc functions
+    where functions.pronamespace = 'public'::regnamespace
+      and functions.proname in (
+        'review_site_security_events',
+        'review_site_security_visitor',
+        'site_security_dashboard',
+        'purge_site_security_admin_audit'
+      )
+      and has_function_privilege('service_role', functions.oid, 'EXECUTE')
+      and not has_function_privilege('anon', functions.oid, 'EXECUTE')
+      and not has_function_privilege('authenticated', functions.oid, 'EXECUTE')
+  ),
+  'only service role can execute the security operations RPCs'
+);
+
+select ok(
+  exists (
+    select 1
+    from pg_trigger
+    where tgrelid = 'public.site_security_admin_audit'::regclass
+      and tgname = 'site_security_admin_audit_append_only'
+      and tgenabled <> 'D'
+  ),
+  'site security audit append-only trigger is enabled'
+);
+
+select throws_ok(
+  $$select public.site_security_dashboard(null, now())$$,
+  'P0001',
+  'Security dashboard range must be between 1 minute and 30 days',
+  'dashboard rejects a null time-range boundary'
+);
+
+select throws_ok(
+  $$
+    select public.review_site_security_events(
+      array[gen_random_uuid()],
+      'invalid',
+      gen_random_uuid()
+    )
+  $$,
+  'P0001',
+  'Invalid security event review status',
+  'event review RPC rejects unsupported review states'
+);
+
+select is(
+  (
+    select column_default
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'honeypot_visitors'
+      and column_name = 'review_status'
+  ),
+  '''new''::text',
+  'visitors begin in the new review state'
+);
+
+select throws_ok(
+  $$
+    select public.review_site_security_visitor(
+      gen_random_uuid(),
+      'malicious',
+      gen_random_uuid()
+    )
+  $$,
+  'P0001',
+  'Invalid visitor review status',
+  'visitor review RPC rejects unsupported review states'
+);
+
+select has_column(
+  'public',
+  'honeypot_ip_restrictions',
+  'enforcement_mode',
+  'IP restriction records identify the enforcement method'
+);
+
+select is(
+  (
+    select column_default
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'honeypot_ip_restrictions'
+      and column_name = 'enforcement_mode'
+  ),
+  '''cloudflare_zone''::text',
+  'existing and new restrictions default to Cloudflare zone enforcement'
+);
+
+select lives_ok(
+  $$
+    with visitor as (
+      insert into public.honeypot_visitors (source_hash, ip_address)
+      values (repeat('d', 64), '203.0.113.12'::inet)
+      returning id
+    )
+    insert into public.honeypot_ip_restrictions (
+      visitor_id,
+      ip_address,
+      status,
+      duration,
+      reason,
+      administrator_id,
+      enforcement_mode
+    )
+    select
+      visitor.id,
+      '203.0.113.12'::inet,
+      'active',
+      'permanent',
+      'Worker-only test restriction',
+      gen_random_uuid(),
+      'worker_only'
+    from visitor
+  $$,
+  'an active worker-only restriction can be stored without a Cloudflare rule'
+);
+
+select ok(
+  exists (
+    select 1
+    from public.honeypot_ip_restrictions
+    where ip_address = '203.0.113.12'::inet
+      and status = 'active'
+      and enforcement_mode = 'worker_only'
+      and cloudflare_rule_id is null
+  ),
+  'worker-only restriction is represented without a fabricated Cloudflare rule'
+);
+
+select lives_ok(
+  $$
+    insert into public.site_security_events (
+      source_hash,
+      category,
+      event_type,
+      severity,
+      risk_score,
+      request_method,
+      route,
+      http_status,
+      signals,
+      correlation_id,
+      dedupe_key,
+      window_started_at,
+      first_seen,
+      last_seen,
+      created_at
+    )
+    values (
+      repeat('a', 64),
+      'traffic',
+      'recent_activity_test',
+      'low',
+      4,
+      'GET',
+      '/',
+      404,
+      '["client_error_burst"]'::jsonb,
+      gen_random_uuid(),
+      repeat('9', 64),
+      now() - interval '30 seconds',
+      now() - interval '30 seconds',
+      now() - interval '30 seconds',
+      now() - interval '3 days'
+    )
+  $$,
+  'security dashboard test event can be inserted'
+);
+
+select is(
+  (
+    public.site_security_dashboard(
+      now() - interval '31 seconds',
+      now() - interval '29 seconds'
+    )->>'totalEvents'
+  )::integer,
+  1,
+  'security dashboard includes an older episode with activity in the selected range'
+);
+
+select is(
+  (
+    select sum((bucket.value->>'event_count')::integer)::integer
+    from jsonb_array_elements(
+      public.site_security_dashboard(
+        now() - interval '31 seconds',
+        now() - interval '29 seconds'
+      )->'eventsOverTime'
+    ) as bucket(value)
+  ),
+  1,
+  'security dashboard time series uses the latest activity timestamp'
+);
+
+insert into public.site_security_admin_audit (
+  id, action, previous_status, new_status
+)
+values (
+  '00000000-0000-4000-8000-000000000051',
+  'event_review_status_changed',
+  'new',
+  'reviewed'
+);
+
+select throws_ok(
+  $$
+    update public.site_security_admin_audit
+    set new_status = 'resolved'
+    where id = '00000000-0000-4000-8000-000000000051'
+  $$,
+  'P0001',
+  'Security operations audit records are append-only',
+  'site security audit rows cannot be updated'
+);
+
+select throws_ok(
+  $$
+    delete from public.site_security_admin_audit
+    where id = '00000000-0000-4000-8000-000000000051'
+  $$,
+  'P0001',
+  'Security operations audit records may only be deleted by retention cleanup',
+  'site security audit rows cannot be deleted outside retention cleanup'
 );
 
 select * from finish();

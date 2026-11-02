@@ -1,34 +1,21 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  Plus,
-  Home,
-  Pencil,
-  Trash2,
-  Eye,
-  EyeOff,
-  Search,
-  Upload,
-  X,
-  Video,
-  ChevronUp,
-  ChevronDown,
-  MapPin,
-} from "lucide-react";
+import { Plus, Home, Pencil, Trash2, Eye, EyeOff, Search, MapPin } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { adminMediaPreviewUrl } from "@/lib/admin/media";
-import {
-  mediaUrl,
-  fileExt,
-  isImageFile,
-  isVideoFile,
-  isVideoUrl,
-  MAX_UPLOAD_BYTES,
-} from "@/lib/media";
+import { isVideoUrl, storagePathFromMediaUrl } from "@/lib/media";
 import type { PropertyRow } from "@/lib/admin/queries";
+import {
+  PropertyImageManager,
+  type ManagedPropertyImage,
+} from "@/components/admin/PropertyImageManager";
+import { PropertyPreviewDialog } from "@/components/admin/PropertyPreviewDialog";
+import type { Property, PropertyType } from "@/data/properties";
+import { isManagedPropertyMediaPath } from "@/lib/admin/property-images";
+import { useLanguage } from "@/i18n/LanguageProvider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -86,13 +73,7 @@ const hasFloor = (t: PropType) =>
   t === "Апартамент" || t === "Офис" || t === "Магазин" || t === "Бизнес имот" || t === "Къща";
 const hasRooms = (t: PropType) => t !== "Парцел" && t !== "Земеделска земя";
 
-type Img = {
-  id?: string;
-  url: string;
-  preview_url?: string;
-  storage_path?: string | null;
-  sort_order: number;
-};
+type Img = ManagedPropertyImage;
 
 const empty = {
   title: "",
@@ -129,6 +110,8 @@ function PropertiesAdmin() {
   const [editing, setEditing] = useState<PropertyRow | null>(null);
   const [open, setOpen] = useState(false);
   const normalizedSearch = search.trim().replace(/[\r\n]/g, " ");
+  const deletingIdsRef = useRef(new Set<string>());
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
 
   const propertiesQuery = useQuery({
     queryKey: [
@@ -173,18 +156,73 @@ function PropertiesAdmin() {
   const items = propertiesQuery.data?.items ?? [];
   const totalPages = Math.max(1, Math.ceil((propertiesQuery.data?.count ?? 0) / PAGE_SIZE));
 
+  useEffect(() => {
+    if (!propertiesQuery.data) return;
+    const lastPage = Math.max(0, totalPages - 1);
+    if (page > lastPage) setPage(lastPage);
+  }, [page, propertiesQuery.data, totalPages]);
+
   const delMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("properties").delete().eq("id", id);
+      const { data: property, error: propertyError } = await supabase
+        .from("properties")
+        .select("id,main_image")
+        .eq("id", id)
+        .maybeSingle();
+      if (propertyError) throw propertyError;
+      if (!property) throw new Error("Имотът вече не съществува или нямате достъп до него.");
+
+      const { data: propertyImages, error: imagesError } = await supabase
+        .from("property_images")
+        .select("url,storage_path")
+        .eq("property_id", id);
+      if (imagesError) throw imagesError;
+
+      const { data: deleted, error } = await supabase
+        .from("properties")
+        .delete()
+        .eq("id", id)
+        .select("id")
+        .maybeSingle();
       if (error) throw error;
+      if (!deleted) throw new Error("Имотът не беше изтрит.");
+
+      return cleanupUnusedPropertyMedia([
+        ...(propertyImages ?? []),
+        ...(property.main_image ? [{ url: property.main_image, storage_path: null }] : []),
+      ]);
     },
-    onSuccess: () => {
-      toast.success("Имотът е изтрит");
-      qc.invalidateQueries({ queryKey: ["admin-properties"] });
-      qc.invalidateQueries({ queryKey: ["admin-stats"] });
+    onSuccess: async (cleanupFailures) => {
+      if (cleanupFailures > 0) {
+        toast.warning(
+          `Имотът е изтрит, но ${cleanupFailures} файла не бяха премахнати. Проверете Storage за остатъчни файлове.`,
+        );
+      } else {
+        toast.success("Имотът е изтрит");
+      }
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["admin-properties"] }),
+        qc.invalidateQueries({ queryKey: ["admin-stats"] }),
+      ]);
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (error: Error) => toast.error(`Имотът не беше изтрит: ${error.message}`),
   });
+
+  function deleteProperty(id: string) {
+    if (deletingIdsRef.current.has(id)) return;
+    deletingIdsRef.current.add(id);
+    setDeletingIds((current) => new Set(current).add(id));
+    delMutation.mutate(id, {
+      onSettled: () => {
+        deletingIdsRef.current.delete(id);
+        setDeletingIds((current) => {
+          const next = new Set(current);
+          next.delete(id);
+          return next;
+        });
+      },
+    });
+  }
 
   const toggleMutation = useMutation({
     mutationFn: async ({ id, is_published }: { id: string; is_published: boolean }) => {
@@ -413,7 +451,7 @@ function PropertiesAdmin() {
                         <Button
                           size="icon"
                           variant="ghost"
-                          disabled={toggleMutation.isPending}
+                          disabled={toggleMutation.isPending || deletingIds.has(p.id)}
                           onClick={() =>
                             toggleMutation.mutate({ id: p.id, is_published: !p.is_published })
                           }
@@ -430,6 +468,7 @@ function PropertiesAdmin() {
                         <Button
                           size="icon"
                           variant="ghost"
+                          disabled={deletingIds.has(p.id)}
                           onClick={() => openEdit(p)}
                           title="Редактирай"
                           aria-label={`Редактирай ${p.title}`}
@@ -440,8 +479,9 @@ function PropertiesAdmin() {
                         <Button
                           size="icon"
                           variant="ghost"
+                          disabled={deletingIds.has(p.id)}
                           onClick={() => {
-                            if (confirm(`Изтрий "${p.title}"?`)) delMutation.mutate(p.id);
+                            if (confirm(`Изтрий "${p.title}"?`)) deleteProperty(p.id);
                           }}
                           title="Изтрий"
                           aria-label={`Изтрий ${p.title}`}
@@ -553,7 +593,7 @@ function PropertiesAdmin() {
                   size="icon"
                   variant="ghost"
                   className="h-11 w-11 rounded-lg"
-                  disabled={toggleMutation.isPending}
+                  disabled={toggleMutation.isPending || deletingIds.has(p.id)}
                   onClick={() => toggleMutation.mutate({ id: p.id, is_published: !p.is_published })}
                   aria-label={p.is_published ? `Скрий ${p.title}` : `Публикувай ${p.title}`}
                 >
@@ -563,6 +603,7 @@ function PropertiesAdmin() {
                   size="icon"
                   variant="ghost"
                   className="h-11 w-11 rounded-lg"
+                  disabled={deletingIds.has(p.id)}
                   onClick={() => openEdit(p)}
                   aria-label={`Редактирай ${p.title}`}
                 >
@@ -572,8 +613,9 @@ function PropertiesAdmin() {
                   size="icon"
                   variant="ghost"
                   className="h-11 w-11 rounded-lg"
+                  disabled={deletingIds.has(p.id)}
                   onClick={() => {
-                    if (confirm(`Изтрий "${p.title}"?`)) delMutation.mutate(p.id);
+                    if (confirm(`Изтрий "${p.title}"?`)) deleteProperty(p.id);
                   }}
                   aria-label={`Изтрий ${p.title}`}
                 >
@@ -636,18 +678,26 @@ function PropertyDialog({
   editing: PropertyRow | null;
   onSaved: () => void;
 }) {
+  const { t } = useLanguage();
   const [form, setForm] = useState(empty);
   const [images, setImages] = useState<Img[]>([]);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [recordId, setRecordId] = useState<string | null>(editing?.id ?? null);
+  const [removedImages, setRemovedImages] = useState<Img[]>([]);
+  const [galleryLoadFailed, setGalleryLoadFailed] = useState(false);
   const uploadedBeforeSave = useRef<string[]>([]);
+  const savingRef = useRef(false);
 
-  // Initialize the form once, when the dialog opens
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
     (async () => {
       uploadedBeforeSave.current = [];
+      setRecordId(editing?.id ?? null);
+      setRemovedImages([]);
+      setImages([]);
+      setGalleryLoadFailed(false);
       if (editing) {
         setForm({
           title: editing.title,
@@ -679,15 +729,26 @@ function PropertyDialog({
           .eq("property_id", editing.id)
           .order("sort_order");
         if (error) throw error;
-        const loadedImages = await Promise.all(
+        const loadedImages: Img[] = await Promise.all(
           (data ?? []).map(async (image) => ({
             id: image.id,
             url: image.url,
             preview_url: await adminMediaPreviewUrl(image.url),
             storage_path: image.storage_path,
             sort_order: image.sort_order,
+            name: image.storage_path?.split("/").pop() ?? image.url.split("/").pop() ?? undefined,
           })),
         );
+        if (editing.main_image && !loadedImages.some((image) => image.url === editing.main_image)) {
+          loadedImages.unshift({
+            url: editing.main_image,
+            preview_url: await adminMediaPreviewUrl(editing.main_image),
+            storage_path: storagePathFromMediaUrl(editing.main_image),
+            sort_order: -1,
+            name: editing.main_image.split("/").pop() ?? undefined,
+            persisted: true,
+          });
+        }
         if (!cancelled) {
           setImages(loadedImages);
         }
@@ -696,8 +757,10 @@ function PropertyDialog({
         setImages([]);
       }
     })().catch((error: unknown) => {
-      if (!cancelled)
+      if (!cancelled) {
+        setGalleryLoadFailed(true);
         toast.error(error instanceof Error ? error.message : "Галерията не можа да се зареди.");
+      }
     });
     return () => {
       cancelled = true;
@@ -705,136 +768,75 @@ function PropertyDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editing?.id]);
 
-  async function uploadFiles(files: FileList | null) {
-    if (!files || files.length === 0) return;
-    setUploading(true);
-    try {
-      const uploaded: Img[] = [];
-      for (const file of Array.from(files)) {
-        if (!isImageFile(file) && !isVideoFile(file)) {
-          toast.error(`Неподдържан файл: ${file.name}`);
-          continue;
-        }
-        if (file.size > MAX_UPLOAD_BYTES) {
-          toast.error(`Файлът е твърде голям: ${file.name} (макс. 25MB)`);
-          continue;
-        }
-        const path = `${crypto.randomUUID()}.${fileExt(file)}`;
-        const { error } = await supabase.storage.from("property-images").upload(path, file, {
-          contentType: file.type || "application/octet-stream",
-          upsert: false,
-        });
-        if (error) throw error;
-        uploadedBeforeSave.current.push(path);
-        const url = mediaUrl(path);
-        uploaded.push({
-          url,
-          preview_url: await adminMediaPreviewUrl(url),
-          storage_path: path,
-          sort_order: images.length + uploaded.length,
-        });
-      }
-      const next = [...images, ...uploaded];
-      setImages(next);
-      const firstImage = uploaded.find((image) => !isVideoUrl(image.url));
-      if (!form.main_image && firstImage) setForm((f) => ({ ...f, main_image: firstImage.url }));
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Грешка при качване");
-    } finally {
-      setUploading(false);
-    }
-  }
-
-  async function removeImage(idx: number) {
-    const img = images[idx];
-    if (img.id) {
-      const { error } = await supabase.from("property_images").delete().eq("id", img.id);
-      if (error) {
-        toast.error(`Снимката не може да бъде премахната: ${error.message}`);
-        return;
-      }
-    }
-    if (img.storage_path) {
-      const { error } = await supabase.storage.from("property-images").remove([img.storage_path]);
-      if (error && !img.id) {
-        toast.error(`Файлът не може да бъде премахнат: ${error.message}`);
-        return;
-      }
-      if (error) {
-        toast.error(`Записът е премахнат, но файлът остана в хранилището: ${error.message}`);
-      } else {
-        uploadedBeforeSave.current = uploadedBeforeSave.current.filter(
-          (path) => path !== img.storage_path,
-        );
-      }
-    }
-    const nextImages = images
-      .filter((_, i) => i !== idx)
-      .map((image, sort_order) => ({ ...image, sort_order }));
-    setImages(nextImages);
-    if (form.main_image === img.url) {
-      setForm((current) => ({
-        ...current,
-        main_image: nextImages.find((image) => !isVideoUrl(image.url))?.url ?? "",
-      }));
-    }
-  }
-
-  function moveImage(index: number, offset: -1 | 1) {
-    const target = index + offset;
-    if (target < 0 || target >= images.length) return;
-    const reordered = [...images];
-    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
-    setImages(reordered.map((image, sort_order) => ({ ...image, sort_order })));
-  }
-
   async function handleDialogOpenChange(nextOpen: boolean) {
+    if (!nextOpen && uploading) {
+      toast.error(t("admin.images.waitBeforeClose"));
+      return false;
+    }
+    if (!nextOpen && (saving || savingRef.current)) return false;
     if (!nextOpen && uploadedBeforeSave.current.length > 0) {
       const paths = [...uploadedBeforeSave.current];
       const { error } = await supabase.storage.from("property-images").remove(paths);
       if (error) {
-        toast.error(
-          `Качените файлове не можаха да се почистят. Затворете отново след проверка: ${error.message}`,
-        );
-        return;
+        toast.error(`${t("admin.images.cleanupError")} ${error.message}`);
+        return false;
       }
       uploadedBeforeSave.current = [];
     }
     onOpenChange(nextOpen);
+    return true;
   }
 
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
+    if (savingRef.current) return;
     if (!form.title.trim()) return toast.error("Въведете заглавие");
+    if (galleryLoadFailed) return toast.error(t("admin.images.galleryLoadError"));
+    if (uploading) return toast.error(t("admin.images.waitBeforeSave"));
     if (form.yard_area != null && form.yard_area < 0) {
       return toast.error("Площта на двора не може да бъде отрицателна.");
     }
+    if (
+      !Number.isFinite(form.price) ||
+      form.price < 0 ||
+      [form.area, form.yard_area, form.rooms].some(
+        (value) => value != null && (!Number.isFinite(value) || value < 0),
+      )
+    ) {
+      return toast.error("Проверете въведените цена и площи.");
+    }
+    savingRef.current = true;
     setSaving(true);
-    let propertyWriteCompleted = false;
+    let propertySaved = false;
     try {
+      const coverImage =
+        images.find((image) => image.url === form.main_image && !isVideoUrl(image.url)) ??
+        images.find((image) => !isVideoUrl(image.url));
       const payload = {
         ...form,
         price: Number(form.price),
-        area: form.area ? Number(form.area) : null,
+        area: form.area != null ? Number(form.area) : null,
         yard_area:
           (form.type === "Къща" || form.type === "Апартамент") && form.yard_area != null
             ? Number(form.yard_area)
             : null,
-        rooms: hasRooms(form.type) && form.rooms ? Number(form.rooms) : null,
+        rooms: hasRooms(form.type) && form.rooms != null ? Number(form.rooms) : null,
         layout: hasLayout(form.type) && form.layout ? form.layout : null,
         floor: hasFloor(form.type) && form.floor ? form.floor : null,
-        map_lat: form.map_lat ? Number(form.map_lat) : null,
-        map_lng: form.map_lng ? Number(form.map_lng) : null,
-        main_image:
-          form.main_image && !isVideoUrl(form.main_image)
-            ? form.main_image
-            : images.find((image) => !isVideoUrl(image.url))?.url || null,
+        map_lat: form.map_lat != null ? Number(form.map_lat) : null,
+        map_lng: form.map_lng != null ? Number(form.map_lng) : null,
+        main_image: coverImage?.url ?? null,
       };
-      let propertyId = editing?.id;
-      if (editing) {
-        const { error } = await supabase.from("properties").update(payload).eq("id", editing.id);
+      let propertyId = recordId;
+      if (propertyId) {
+        const { data, error } = await supabase
+          .from("properties")
+          .update(payload)
+          .eq("id", propertyId)
+          .select("id")
+          .maybeSingle();
         if (error) throw error;
-        propertyWriteCompleted = true;
+        if (!data) throw new Error(t("admin.images.propertySaveError"));
       } else {
         const {
           data: { user },
@@ -846,48 +848,179 @@ function PropertyDialog({
           .single();
         if (error) throw error;
         propertyId = data.id;
-        propertyWriteCompleted = true;
+        setRecordId(propertyId);
       }
-      // Sync gallery: insert new images (those without id) tied to property
-      for (const [sort_order, image] of images.entries()) {
-        if (!image.id || image.sort_order === sort_order) continue;
-        const { error } = await supabase
-          .from("property_images")
-          .update({ sort_order })
-          .eq("id", image.id);
-        if (error) throw error;
+      propertySaved = true;
+
+      const galleryImages = images.filter((image) => !image.persisted);
+      const galleryOrder = await Promise.all(
+        galleryImages.map(async (image, sort_order) => {
+          if (!image.id) return null;
+          if (image.sort_order === sort_order) return null;
+          const result = await supabase
+            .from("property_images")
+            .update({ sort_order })
+            .eq("id", image.id!)
+            .eq("property_id", propertyId!)
+            .select("id")
+            .maybeSingle();
+          if (result.error) throw result.error;
+          if (!result.data) throw new Error(t("admin.images.gallerySaveError"));
+          return { id: image.id!, sort_order };
+        }),
+      );
+      if (galleryOrder.some(Boolean)) {
+        setImages((current) =>
+          current.map((image) => {
+            const persisted = galleryOrder.find((item) => item?.id === image.id);
+            return persisted ? { ...image, sort_order: persisted.sort_order } : image;
+          }),
+        );
       }
-      const newOnes = images.filter((i) => !i.id);
-      if (propertyId && newOnes.length > 0) {
-        const { error } = await supabase.from("property_images").insert(
-          newOnes.map((image) => ({
-            property_id: propertyId,
+
+      const newOnes = images.filter((image) => !image.id && !image.persisted);
+      if (newOnes.length > 0) {
+        const storagePaths = [
+          ...new Set(newOnes.flatMap((image) => (image.storage_path ? [image.storage_path] : []))),
+        ];
+        let alreadyLinked: typeof newOnes = [];
+        if (storagePaths.length > 0) {
+          const { data, error } = await supabase
+            .from("property_images")
+            .select("id,property_id,url,storage_path,sort_order")
+            .eq("property_id", propertyId)
+            .in("storage_path", storagePaths);
+          if (error) throw error;
+          alreadyLinked = (data ?? []).map((image) => ({
+            id: image.id,
             url: image.url,
             storage_path: image.storage_path,
-            sort_order: images.indexOf(image),
-          })),
+            sort_order: image.sort_order,
+          }));
+        }
+        const linkedPaths = new Set(alreadyLinked.map((image) => image.storage_path));
+        const imagesToInsert = newOnes.filter(
+          (image) => !image.storage_path || !linkedPaths.has(image.storage_path),
         );
-        if (error) throw error;
+        let inserted: Array<{
+          id: string;
+          property_id: string;
+          url: string;
+          storage_path: string | null;
+          sort_order: number;
+        }> = [];
+        if (imagesToInsert.length > 0) {
+          const { data, error } = await supabase
+            .from("property_images")
+            .insert(
+              imagesToInsert.map((image) => ({
+                property_id: propertyId,
+                url: image.url,
+                storage_path: image.storage_path,
+                sort_order: images.filter((candidate) => !candidate.persisted).indexOf(image),
+              })),
+            )
+            .select("id,property_id,url,storage_path,sort_order");
+          if (error) throw error;
+          inserted = data ?? [];
+          if (inserted.length !== imagesToInsert.length) {
+            throw new Error(t("admin.images.saveError"));
+          }
+        }
+        const linkedImages = [...alreadyLinked, ...inserted];
+        setImages((current) =>
+          current.map((image) => {
+            const row = linkedImages.find(
+              (linkedImage) =>
+                linkedImage.storage_path === image.storage_path && linkedImage.url === image.url,
+            );
+            return row ? { ...image, id: row.id } : image;
+          }),
+        );
+        const persistedPaths = new Set(
+          linkedImages.map((image) => image.storage_path).filter(Boolean),
+        );
+        uploadedBeforeSave.current = uploadedBeforeSave.current.filter(
+          (path) => !persistedPaths.has(path),
+        );
       }
-      toast.success(editing ? "Запазено" : "Имотът е добавен");
-      uploadedBeforeSave.current = [];
-      onOpenChange(false);
+
+      const removedIds = new Set<string>();
+      for (const image of [...removedImages]) {
+        await removePropertyImage(propertyId, image);
+        if (image.id) removedIds.add(image.id);
+        setRemovedImages((current) =>
+          current.filter((candidate) => !sameManagedImage(candidate, image)),
+        );
+      }
+      setRemovedImages([]);
+      setImages((current) => current.filter((image) => !image.id || !removedIds.has(image.id)));
       onSaved();
+      const closed = await handleDialogOpenChange(false);
+      if (!closed) return;
+      toast.success(editing || recordId ? "Запазено" : "Имотът е добавен");
     } catch (err) {
-      if (propertyWriteCompleted) uploadedBeforeSave.current = [];
-      toast.error(err instanceof Error ? err.message : "Грешка");
+      if (propertySaved) {
+        onSaved();
+        toast.error(
+          `${t("admin.images.propertySavedGalleryFailed")} ${err instanceof Error ? err.message : t("admin.images.saveError")}`,
+        );
+      } else {
+        toast.error(err instanceof Error ? err.message : t("admin.images.saveError"));
+      }
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }
+
+  const coverImage = images.find(
+    (image) => image.url === form.main_image && !isVideoUrl(image.url),
+  );
+  const previewGalleryImages = [
+    ...(coverImage ? [coverImage.preview_url ?? coverImage.url] : []),
+    ...images
+      .filter((image) => !isVideoUrl(image.url) && image.url !== coverImage?.url)
+      .map((image) => image.preview_url ?? image.url),
+  ];
+  const previewType: PropertyType =
+    form.type === "Апартамент" ||
+    form.type === "Къща" ||
+    form.type === "Парцел" ||
+    form.type === "Земеделска земя"
+      ? form.type
+      : "Бизнес имот";
+  const previewProperty: Property = {
+    id: recordId ?? "unsaved-preview",
+    title: form.title,
+    type: previewType,
+    listing: form.status === "Под наем" || form.status === "Отдаден" ? "Наем" : "Продажба",
+    city: form.city,
+    district: form.district,
+    price: Number(form.price),
+    area: Number(form.area ?? 0),
+    yardArea: form.yard_area,
+    rooms: form.rooms,
+    floor: form.floor,
+    layout: LAYOUTS.find((layout) => layout === form.layout),
+    image: previewGalleryImages[0] ?? null,
+    images: previewGalleryImages,
+    description: form.description,
+  };
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => void handleDialogOpenChange(nextOpen)}>
       <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="font-display text-2xl text-navy">
-            {editing ? "Редактирай имот" : "Нов имот"}
-          </DialogTitle>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <DialogTitle className="font-display text-2xl text-navy">
+              {editing || recordId ? "Редактирай имот" : "Нов имот"}
+            </DialogTitle>
+            <PropertyPreviewDialog
+              property={previewProperty}
+              galleryImages={previewGalleryImages}
+            />
+          </div>
         </DialogHeader>
         <form onSubmit={onSave} className="space-y-5">
           <Field label="Заглавие" required>
@@ -1056,126 +1189,31 @@ function PropertyDialog({
             />
           </Field>
 
-          {/* Images */}
-          <div>
-            <Label>Снимки и видеа</Label>
-            <div className="mt-2 grid grid-cols-3 gap-3 sm:grid-cols-4">
-              {images.map((img, idx) => (
-                <div
-                  key={idx}
-                  className="group relative aspect-square overflow-hidden rounded-lg border"
-                >
-                  {isVideoUrl(img.url) ? (
-                    <video
-                      src={img.preview_url ?? img.url}
-                      className="h-full w-full object-cover"
-                      muted
-                      playsInline
-                    />
-                  ) : (
-                    <img
-                      src={img.preview_url ?? img.url}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => removeImage(idx)}
-                    className="absolute right-1 top-1 grid h-9 w-9 place-items-center rounded-full bg-black/65 text-white opacity-100 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold sm:opacity-0 sm:group-hover:opacity-100"
-                    aria-label={`Премахни медия ${idx + 1}`}
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                  <div className="absolute right-1 bottom-1 flex gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
-                    <button
-                      type="button"
-                      disabled={idx === 0}
-                      onClick={() => moveImage(idx, -1)}
-                      className="grid h-9 w-9 place-items-center rounded-lg bg-black/70 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-40"
-                      aria-label={`Премести медия ${idx + 1} нагоре`}
-                    >
-                      <ChevronUp className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      disabled={idx === images.length - 1}
-                      onClick={() => moveImage(idx, 1)}
-                      className="grid h-9 w-9 place-items-center rounded-lg bg-black/70 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-40"
-                      aria-label={`Премести медия ${idx + 1} надолу`}
-                    >
-                      <ChevronDown className="h-4 w-4" />
-                    </button>
-                  </div>
-                  {isVideoUrl(img.url) && (
-                    <span className="absolute bottom-1 left-1 inline-flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">
-                      <Video className="h-3 w-3" /> Видео
-                    </span>
-                  )}
-                  {!isVideoUrl(img.url) && form.main_image === img.url && (
-                    <span className="absolute bottom-1 left-1 rounded bg-gold px-1.5 py-0.5 text-[10px] font-medium text-navy-deep">
-                      Основна
-                    </span>
-                  )}
-                  {!isVideoUrl(img.url) && form.main_image !== img.url && (
-                    <button
-                      type="button"
-                      onClick={() => setForm({ ...form, main_image: img.url })}
-                      className="absolute bottom-1 left-1 min-h-9 rounded-lg bg-black/70 px-2 text-[10px] text-white opacity-100 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold sm:opacity-0 sm:group-hover:opacity-100"
-                    >
-                      Основна
-                    </button>
-                  )}
-                </div>
-              ))}
-              <label className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed text-muted-foreground hover:border-navy hover:text-navy">
-                {uploading ? (
-                  <span className="text-xs">Качване...</span>
-                ) : (
-                  <>
-                    <Upload className="h-5 w-5" />
-                    <span className="text-xs">Качи снимки</span>
-                  </>
-                )}
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  disabled={uploading}
-                  className="hidden"
-                  onChange={(e) => {
-                    void uploadFiles(e.target.files);
-                    e.currentTarget.value = "";
-                  }}
-                />
-              </label>
-              <label className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed text-muted-foreground hover:border-navy hover:text-navy">
-                {uploading ? (
-                  <span className="text-xs">Качване...</span>
-                ) : (
-                  <>
-                    <Video className="h-5 w-5" />
-                    <span className="text-xs">Качи видео</span>
-                  </>
-                )}
-                <input
-                  type="file"
-                  accept="video/*"
-                  multiple
-                  disabled={uploading}
-                  className="hidden"
-                  onChange={(e) => {
-                    void uploadFiles(e.currentTarget.files);
-                    e.currentTarget.value = "";
-                  }}
-                />
-              </label>
-            </div>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Можете да добавите снимки и видео файлове до 25 MB всеки. YouTube/Vimeo линковете
-              остават налични по-долу.
-            </p>
-          </div>
+          <PropertyImageManager
+            images={images}
+            onImagesChange={setImages}
+            coverUrl={form.main_image}
+            onCoverChange={(main_image) => setForm((current) => ({ ...current, main_image }))}
+            onImageRemoved={(image) =>
+              setRemovedImages((current) =>
+                current.some((existing) => sameManagedImage(existing, image))
+                  ? current
+                  : [...current, image],
+              )
+            }
+            onNewUpload={(path) => {
+              if (!uploadedBeforeSave.current.includes(path)) {
+                uploadedBeforeSave.current.push(path);
+              }
+            }}
+            onDiscardedUpload={(path) => {
+              uploadedBeforeSave.current = uploadedBeforeSave.current.filter(
+                (existing) => existing !== path,
+              );
+            }}
+            onUploadingChange={setUploading}
+            disabled={saving || galleryLoadFailed}
+          />
 
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Видео URL (YouTube/Vimeo)">
@@ -1266,6 +1304,133 @@ function PropertyDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+async function removePropertyImage(propertyId: string, image: Img): Promise<void> {
+  let removedRow: {
+    id: string;
+    property_id: string;
+    url: string;
+    storage_path: string | null;
+    sort_order: number;
+    created_at: string;
+  } | null = null;
+
+  if (image.id) {
+    const { data, error } = await supabase
+      .from("property_images")
+      .delete()
+      .eq("id", image.id)
+      .eq("property_id", propertyId)
+      .select("id,property_id,url,storage_path,sort_order,created_at")
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) throw new Error("The property image could not be found.");
+    removedRow = data;
+  }
+
+  const storagePath = image.storage_path ?? storagePathFromMediaUrl(image.url);
+  if (!storagePath) return;
+
+  try {
+    if (await hasPropertyMediaReferences(image.url, storagePath)) return;
+
+    const { error } = await supabase.storage.from("property-images").remove([storagePath]);
+    if (error) throw error;
+  } catch (error) {
+    if (removedRow) {
+      const { error: restoreError } = await supabase.from("property_images").insert(removedRow);
+      if (restoreError) {
+        console.error("[property-images] Image link restoration failed", restoreError);
+        throw new Error(
+          "Image cleanup failed and the property image reference could not be restored.",
+        );
+      }
+    }
+    throw new Error(
+      `The image could not be safely removed. Its property reference was restored where possible. ${
+        error instanceof Error ? error.message : ""
+      }`.trim(),
+    );
+  }
+}
+
+async function cleanupUnusedPropertyMedia(
+  images: Array<{ url: string; storage_path: string | null }>,
+): Promise<number> {
+  const mediaByPath = new Map<string, { url: string; storage_path: string | null }>();
+  for (const image of images) {
+    const storagePath = image.storage_path ?? storagePathFromMediaUrl(image.url);
+    if (storagePath) mediaByPath.set(storagePath, { ...image, storage_path: storagePath });
+  }
+
+  let failures = 0;
+  for (const [storagePath, image] of mediaByPath) {
+    if (!isManagedPropertyMediaPath(storagePath)) {
+      failures += 1;
+      continue;
+    }
+    try {
+      if (await hasPropertyMediaReferences(image.url, storagePath)) continue;
+      const { error } = await supabase.storage.from("property-images").remove([storagePath]);
+      if (error) throw error;
+    } catch (error) {
+      failures += 1;
+      console.error("[property-images] Unreferenced image cleanup failed", error);
+    }
+  }
+  return failures;
+}
+
+async function hasPropertyMediaReferences(url: string, storagePath: string): Promise<boolean> {
+  const [galleryPath, galleryUrl, coverUrl, teamPhoto, siteSettings] = await Promise.all([
+    supabase
+      .from("property_images")
+      .select("id", { count: "exact", head: true })
+      .eq("storage_path", storagePath),
+    supabase.from("property_images").select("id", { count: "exact", head: true }).eq("url", url),
+    supabase.from("properties").select("id", { count: "exact", head: true }).eq("main_image", url),
+    supabase.from("team_members").select("id", { count: "exact", head: true }).eq("photo_url", url),
+    supabase
+      .from("site_settings")
+      .select("logo_url,hero_image_url,services_image_url,og_image_url")
+      .eq("id", 1)
+      .maybeSingle(),
+  ]);
+  const queryError =
+    galleryPath.error ??
+    galleryUrl.error ??
+    coverUrl.error ??
+    teamPhoto.error ??
+    siteSettings.error;
+  if (queryError) throw queryError;
+
+  const settingsUrls = siteSettings.data
+    ? [
+        siteSettings.data.logo_url,
+        siteSettings.data.hero_image_url,
+        siteSettings.data.services_image_url,
+        siteSettings.data.og_image_url,
+      ]
+    : [];
+  return Boolean(
+    (galleryPath.count ?? 0) > 0 ||
+    (galleryUrl.count ?? 0) > 0 ||
+    (coverUrl.count ?? 0) > 0 ||
+    (teamPhoto.count ?? 0) > 0 ||
+    settingsUrls.some(
+      (reference) =>
+        reference === url || (reference && storagePathFromMediaUrl(reference) === storagePath),
+    ),
+  );
+}
+
+function sameManagedImage(left: Img, right: Img): boolean {
+  return Boolean(
+    (left.id && right.id && left.id === right.id) ||
+    (left.storage_path && right.storage_path && left.storage_path === right.storage_path) ||
+    left.url === right.url,
   );
 }
 

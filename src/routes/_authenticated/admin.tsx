@@ -13,13 +13,21 @@ import {
   X,
   ArrowUpRight,
   ChevronRight,
-  Sparkles,
+  PanelLeft,
+  PanelLeftClose,
+  ScrollText,
   ShieldAlert,
+  ShieldCheck,
+  Database,
+  Ban,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import type { bg } from "@/i18n/bg";
+import { useLanguage } from "@/i18n/LanguageProvider";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({
@@ -33,48 +41,153 @@ export const Route = createFileRoute("/_authenticated/admin")({
 
 type NavItem = {
   to: string;
-  label: string;
+  label: keyof typeof bg;
   icon: typeof LayoutDashboard;
   exact?: boolean;
   adminOnly?: boolean;
-  section?: string;
+  section?: keyof typeof bg;
 };
 
 const NAV: NavItem[] = [
-  { to: "/admin", label: "Табло", icon: LayoutDashboard, exact: true },
-  { to: "/admin/properties", label: "Имоти", icon: Home, adminOnly: true },
-  { to: "/admin/inquiries", label: "Запитвания", icon: MessageSquare },
-  { to: "/admin/pages", label: "Страници", icon: FileText, adminOnly: true },
-  { to: "/admin/team", label: "Екип", icon: Users, adminOnly: true },
-  { to: "/admin/users", label: "Потребители", icon: Users, adminOnly: true },
-  { to: "/admin/settings", label: "Настройки", icon: Settings, adminOnly: true },
+  {
+    to: "/admin",
+    label: "admin.nav.dashboard",
+    icon: LayoutDashboard,
+    exact: true,
+    section: "admin.nav.section.workspace",
+  },
+  {
+    to: "/admin/properties",
+    label: "admin.nav.properties",
+    icon: Home,
+    adminOnly: true,
+    section: "admin.nav.section.properties",
+  },
+  {
+    to: "/admin/inquiries",
+    label: "admin.nav.inquiries",
+    icon: MessageSquare,
+  },
+  {
+    to: "/admin/pages",
+    label: "admin.nav.pages",
+    icon: FileText,
+    adminOnly: true,
+    section: "admin.nav.section.administration",
+  },
+  { to: "/admin/team", label: "admin.nav.team", icon: Users, adminOnly: true },
+  { to: "/admin/users", label: "admin.nav.users", icon: Users, adminOnly: true },
+  { to: "/admin/settings", label: "admin.nav.settings", icon: Settings, adminOnly: true },
+  {
+    to: "/admin/security",
+    label: "admin.nav.security",
+    icon: ShieldCheck,
+    adminOnly: true,
+    exact: true,
+    section: "admin.nav.section.security",
+  },
   {
     to: "/admin/honeypot",
-    label: "Honeypot Monitor",
+    label: "admin.nav.honeypot",
     icon: ShieldAlert,
     adminOnly: true,
-    section: "Разширени",
+  },
+  {
+    to: "/admin/restrictions",
+    label: "admin.nav.restrictions",
+    icon: Ban,
+    adminOnly: true,
+    exact: true,
+  },
+  {
+    to: "/admin/audit",
+    label: "admin.nav.audit",
+    icon: ScrollText,
+    adminOnly: true,
+    exact: true,
+  },
+  {
+    to: "/admin/security-health",
+    label: "admin.nav.health",
+    icon: Database,
+    adminOnly: true,
+    exact: true,
   },
 ];
 
 function AdminLayout() {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { role, isAdmin } = Route.useRouteContext();
   const [email, setEmail] = useState<string>("");
   const [open, setOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? ""));
+    let active = true;
+    void supabase.auth
+      .getUser()
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error) {
+          console.error("[admin] Unable to load current account", error);
+          return;
+        }
+        setEmail(data.user?.email ?? "");
+      })
+      .catch((error: unknown) => {
+        if (active) console.error("[admin] Unable to load current account", error);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
+  useEffect(() => {
+    if (!open) return;
+
+    const mediaQuery = window.matchMedia("(max-width: 1023px)");
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    const closeOnDesktop = (event: MediaQueryListEvent) => {
+      if (!event.matches) setOpen(false);
+    };
+
+    if (mediaQuery.matches) document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", closeOnEscape);
+    mediaQuery.addEventListener("change", closeOnDesktop);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", closeOnEscape);
+      mediaQuery.removeEventListener("change", closeOnDesktop);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
   async function signOut() {
-    await supabase.auth.signOut();
-    navigate({ to: "/auth" });
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      await navigate({ to: "/auth" });
+    } catch (error) {
+      console.error("[admin] Sign out failed", error);
+      toast.error(t("admin.nav.signOutError"));
+    } finally {
+      setSigningOut(false);
+    }
   }
 
   const isActive = (to: string, exact?: boolean) =>
-    exact ? pathname === to : pathname.startsWith(to);
+    exact ? pathname === to : pathname === to || pathname.startsWith(`${to}/`);
 
   const items = NAV.filter((n) => (n.adminOnly ? isAdmin : true));
 
@@ -87,107 +200,152 @@ function AdminLayout() {
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex w-[min(19rem,88vw)] flex-col bg-[#10213b] text-white shadow-2xl shadow-navy/10 transition-transform duration-200 ease-out lg:sticky lg:top-0 lg:h-screen lg:w-72 lg:shrink-0 lg:translate-x-0 lg:shadow-none",
+          "fixed inset-y-0 left-0 z-40 flex w-[min(19rem,88vw)] flex-col bg-[#10213b] text-white shadow-2xl shadow-navy/10 transition-[width,transform] duration-200 ease-out lg:sticky lg:top-0 lg:h-screen lg:shrink-0 lg:translate-x-0 lg:shadow-none",
+          collapsed ? "lg:w-[5rem]" : "lg:w-72",
           open ? "translate-x-0" : "-translate-x-full",
         )}
-        aria-label="Основна навигация"
+        aria-label={t("admin.nav.title")}
       >
-        <div className="flex h-[5.25rem] items-center gap-3 border-b border-white/10 px-6">
-          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-gold text-navy-deep shadow-lg shadow-black/10">
-            <Building2 className="h-5 w-5" aria-hidden="true" />
-          </div>
-          <div className="leading-tight">
-            <div className="font-display text-xl tracking-wide">Елла</div>
-            <div className="mt-1 text-[10px] font-medium uppercase tracking-[0.2em] text-white/45">
-              Недвижими имоти
-            </div>
-          </div>
+        <div
+          className={cn(
+            "flex h-[5.25rem] items-center gap-3 border-b border-white/10",
+            collapsed ? "px-3 lg:justify-center" : "px-6",
+          )}
+        >
+          <Link
+            to="/"
+            aria-label={t("nav.backToSite")}
+            className={cn(
+              "flex min-w-0 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-[#10213b]",
+              collapsed && "lg:hidden",
+            )}
+          >
+            <img
+              src="/logo-in-site.png"
+              alt="Елла Недвижими Имоти"
+              width={588}
+              height={280}
+              className="h-auto w-36 max-w-full object-contain"
+            />
+          </Link>
+          {collapsed && (
+            <Link
+              to="/"
+              aria-label={t("nav.backToSite")}
+              className="hidden min-h-11 min-w-11 items-center justify-center rounded-md text-gold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold lg:inline-flex"
+            >
+              <Building2 className="h-5 w-5" aria-hidden="true" />
+            </Link>
+          )}
           <Button
             variant="ghost"
             size="icon"
             className="ml-auto text-white/60 hover:bg-white/10 hover:text-white lg:hidden"
             onClick={() => setOpen(false)}
-            aria-label="Затвори менюто"
+            aria-label={t("admin.nav.close")}
           >
             <X className="h-5 w-5" />
           </Button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-4 py-7">
-          <div className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/35">
-            Работно пространство
+        <nav
+          id="admin-primary-navigation"
+          className={cn("flex-1 overflow-y-auto py-6", collapsed ? "px-2 lg:px-2" : "px-4")}
+        >
+          <div
+            className={cn(
+              "mb-3 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/35",
+              collapsed && "lg:hidden",
+            )}
+          >
+            {t("admin.nav.section.administration")}
           </div>
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1">
             {items.map((n) => {
               const active = isActive(n.to, n.exact);
               return (
                 <div key={n.to}>
                   {n.section && (
-                    <div className="mb-2 mt-7 px-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/35">
-                      {n.section}
+                    <div
+                      className={cn(
+                        "mb-2 mt-6 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/35",
+                        collapsed && "lg:hidden",
+                      )}
+                    >
+                      {t(n.section)}
                     </div>
                   )}
                   <Link
                     to={n.to}
                     onClick={() => setOpen(false)}
                     aria-current={active ? "page" : undefined}
+                    title={collapsed ? t(n.label) : undefined}
+                    aria-label={collapsed ? t(n.label) : undefined}
                     className={cn(
-                      "group flex min-h-12 items-center gap-3 rounded-xl px-3.5 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-[#10213b]",
+                      "group flex min-h-11 items-center gap-3 rounded-lg text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-[#10213b]",
+                      collapsed ? "justify-center px-2 lg:px-0" : "px-3",
                       active
-                        ? "bg-white/10 text-white shadow-inner shadow-white/[0.02]"
+                        ? "bg-white/10 text-white"
                         : "text-white/65 hover:bg-white/[0.06] hover:text-white",
                     )}
                   >
                     <span
                       className={cn(
-                        "grid h-8 w-8 place-items-center rounded-lg transition-colors",
+                        "grid h-8 w-8 shrink-0 place-items-center rounded-lg transition-colors",
                         active
                           ? "bg-gold text-navy-deep"
-                          : "bg-white/[0.05] text-white/55 group-hover:bg-white/10 group-hover:text-white",
+                          : "text-white/55 group-hover:bg-white/10 group-hover:text-white",
                       )}
                     >
                       <n.icon className="h-4 w-4" aria-hidden="true" />
                     </span>
-                    {n.label}
+                    <span className={cn("min-w-0 flex-1 truncate", collapsed && "lg:hidden")}>
+                      {t(n.label)}
+                    </span>
                     {active && (
-                      <ChevronRight className="ml-auto h-4 w-4 text-gold" aria-hidden="true" />
+                      <ChevronRight
+                        className={cn("ml-auto h-4 w-4 text-gold", collapsed && "lg:hidden")}
+                        aria-hidden="true"
+                      />
                     )}
                   </Link>
                 </div>
               );
             })}
           </div>
-
-          <div className="mt-9 rounded-2xl border border-white/10 bg-white/[0.045] p-4">
-            <div className="flex items-center gap-2 text-xs font-medium text-gold">
-              <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-              Панел за управление
-            </div>
-            <p className="mt-2 text-xs leading-relaxed text-white/50">
-              Обяви, запитвания и съдържание на едно място.
-            </p>
-          </div>
         </nav>
 
-        <div className="border-t border-white/10 p-4">
-          <div className="flex items-center gap-3 rounded-2xl bg-white/[0.055] p-3">
+        <div className={cn("border-t border-white/10 p-4", collapsed && "lg:p-2")}>
+          <div
+            className={cn(
+              "flex items-center gap-3 rounded-xl bg-white/[0.055] p-3",
+              collapsed && "lg:justify-center lg:p-2",
+            )}
+          >
             <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-gold/30 bg-gold/15 font-display text-lg text-gold">
               {initials}
             </div>
-            <div className="min-w-0 flex-1">
+            <div className={cn("min-w-0 flex-1", collapsed && "lg:hidden")}>
               <div className="truncate text-xs font-medium text-white/85">
-                {email || "Зареждане..."}
+                {email || t("admin.nav.accountLoading")}
               </div>
               <div className="mt-1 text-[10px] uppercase tracking-[0.15em] text-white/40">
-                {role === "admin" ? "Администратор" : "Редактор"}
+                {role === "admin" ? t("admin.nav.roleAdmin") : t("admin.nav.roleEditor")}
               </div>
             </div>
           </div>
           <button
             onClick={signOut}
-            className="mt-2 flex min-h-11 w-full items-center gap-2 rounded-xl px-3 text-sm text-white/55 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+            disabled={signingOut}
+            className={cn(
+              "mt-2 flex min-h-11 w-full items-center gap-2 rounded-xl px-3 text-sm text-white/55 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:cursor-wait disabled:opacity-60",
+              collapsed && "lg:justify-center lg:px-0",
+            )}
+            title={collapsed ? t("admin.nav.signOut") : undefined}
+            aria-busy={signingOut}
           >
-            <LogOut className="h-4 w-4" aria-hidden="true" /> Изход
+            <LogOut className="h-4 w-4" aria-hidden="true" />
+            <span className={cn(collapsed && "lg:hidden")}>{t("admin.nav.signOut")}</span>
           </button>
         </div>
       </aside>
@@ -196,7 +354,7 @@ function AdminLayout() {
         <button
           type="button"
           onClick={() => setOpen(false)}
-          aria-label="Затвори навигацията"
+          aria-label={t("admin.nav.closeOverlay")}
           className="fixed inset-0 z-30 cursor-default bg-navy/45 backdrop-blur-[2px] lg:hidden"
         />
       )}
@@ -208,19 +366,33 @@ function AdminLayout() {
             size="icon"
             className="h-11 w-11 rounded-xl text-navy hover:bg-slate-100 lg:hidden"
             onClick={() => setOpen((o) => !o)}
-            aria-label="Меню"
+            aria-label={open ? t("admin.nav.close") : t("admin.nav.open")}
             aria-expanded={open}
+            aria-controls="admin-primary-navigation"
           >
             {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="hidden h-11 w-11 rounded-xl text-navy hover:bg-slate-100 lg:inline-flex"
+            onClick={() => setCollapsed((value) => !value)}
+            aria-label={collapsed ? t("admin.nav.expand") : t("admin.nav.collapse")}
+            aria-expanded={!collapsed}
+            title={collapsed ? t("admin.nav.expand") : t("admin.nav.collapse")}
+          >
+            {collapsed ? <PanelLeft className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
+          </Button>
           <div className="flex min-w-0 items-center gap-2 text-sm">
-            <span className="hidden text-muted-foreground sm:inline">Работно пространство</span>
+            <span className="hidden text-muted-foreground sm:inline">
+              {t("admin.nav.section.workspace")}
+            </span>
             <ChevronRight
               className="hidden h-3.5 w-3.5 text-slate-300 sm:inline"
               aria-hidden="true"
             />
             <span className="truncate font-semibold text-navy">
-              {currentPage?.label ?? "Админ панел"}
+              {currentPage ? t(currentPage.label) : t("admin.nav.title")}
             </span>
           </div>
           <div className="ml-auto flex items-center gap-2 sm:gap-4">
@@ -229,8 +401,8 @@ function AdminLayout() {
               to="/"
               className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 px-3 text-xs font-medium text-navy transition-colors hover:border-gold/60 hover:bg-gold/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold sm:px-4 sm:text-sm"
             >
-              <span className="hidden sm:inline">Към сайта</span>
-              <span className="sm:hidden">Сайт</span>
+              <span className="hidden sm:inline">{t("admin.nav.site")}</span>
+              <span className="sm:hidden">{t("admin.nav.siteShort")}</span>
               <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
             </Link>
           </div>

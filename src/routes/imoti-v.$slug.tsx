@@ -63,14 +63,6 @@ export const Route = createFileRoute("/imoti-v/$slug")({
       ],
     };
   },
-  notFoundComponent: () => (
-    <main className="mx-auto flex min-h-[60vh] max-w-xl flex-col items-center justify-center px-4 text-center">
-      <h1 className="font-display text-3xl text-navy">Няма активни обяви за този град</h1>
-      <Link to="/" hash="catalog" className="mt-5 text-navy underline underline-offset-4">
-        Разгледайте всички имоти
-      </Link>
-    </main>
-  ),
   component: CityPropertiesPage,
 });
 

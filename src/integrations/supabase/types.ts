@@ -92,6 +92,9 @@ export type Database = {
           operating_system: string | null;
           region: string | null;
           request_count: number;
+          review_status: string;
+          reviewed_at: string | null;
+          reviewed_by: string | null;
           source_hash: string;
           updated_at: string;
           user_agent: string | null;
@@ -117,6 +120,9 @@ export type Database = {
           operating_system?: string | null;
           region?: string | null;
           request_count?: number;
+          review_status?: string;
+          reviewed_at?: string | null;
+          reviewed_by?: string | null;
           source_hash: string;
           updated_at?: string;
           user_agent?: string | null;
@@ -142,6 +148,9 @@ export type Database = {
           operating_system?: string | null;
           region?: string | null;
           request_count?: number;
+          review_status?: string;
+          reviewed_at?: string | null;
+          reviewed_by?: string | null;
           source_hash?: string;
           updated_at?: string;
           user_agent?: string | null;
@@ -239,9 +248,11 @@ export type Database = {
           cloudflare_rule_id: string | null;
           created_at: string;
           duration: string;
+          enforcement_mode: string;
           expires_at: string | null;
           id: string;
           ip_address: string | null;
+          last_verified_at: string | null;
           reason: string;
           released_at: string | null;
           status: string;
@@ -253,9 +264,11 @@ export type Database = {
           cloudflare_rule_id?: string | null;
           created_at?: string;
           duration: string;
+          enforcement_mode?: string;
           expires_at?: string | null;
           id?: string;
           ip_address?: string | null;
+          last_verified_at?: string | null;
           reason: string;
           released_at?: string | null;
           status?: string;
@@ -267,9 +280,11 @@ export type Database = {
           cloudflare_rule_id?: string | null;
           created_at?: string;
           duration?: string;
+          enforcement_mode?: string;
           expires_at?: string | null;
           id?: string;
           ip_address?: string | null;
+          last_verified_at?: string | null;
           reason?: string;
           released_at?: string | null;
           status?: string;
@@ -385,6 +400,125 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      site_security_events: {
+        Row: {
+          category: string;
+          correlation_id: string;
+          created_at: string;
+          dedupe_key: string;
+          event_type: string;
+          first_seen: string;
+          http_status: number;
+          id: string;
+          last_seen: string;
+          occurrence_count: number;
+          observed_requests: number;
+          request_method: string;
+          review_status: string;
+          reviewed_at: string | null;
+          reviewed_by: string | null;
+          risk_score: number;
+          route: string;
+          severity: string;
+          signals: Json;
+          source_hash: string;
+          visitor_id: string | null;
+          window_started_at: string;
+        };
+        Insert: {
+          category: string;
+          correlation_id: string;
+          created_at?: string;
+          dedupe_key: string;
+          event_type: string;
+          first_seen?: string;
+          http_status: number;
+          id?: string;
+          last_seen?: string;
+          occurrence_count?: number;
+          observed_requests?: number;
+          request_method: string;
+          review_status?: string;
+          reviewed_at?: string | null;
+          reviewed_by?: string | null;
+          risk_score: number;
+          route: string;
+          severity: string;
+          signals: Json;
+          source_hash: string;
+          visitor_id?: string | null;
+          window_started_at: string;
+        };
+        Update: {
+          category?: string;
+          correlation_id?: string;
+          created_at?: string;
+          dedupe_key?: string;
+          event_type?: string;
+          first_seen?: string;
+          http_status?: number;
+          id?: string;
+          last_seen?: string;
+          occurrence_count?: number;
+          observed_requests?: number;
+          request_method?: string;
+          review_status?: string;
+          reviewed_at?: string | null;
+          reviewed_by?: string | null;
+          risk_score?: number;
+          route?: string;
+          severity?: string;
+          signals?: Json;
+          source_hash?: string;
+          visitor_id?: string | null;
+          window_started_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "site_security_events_visitor_id_fkey";
+            columns: ["visitor_id"];
+            isOneToOne: false;
+            referencedRelation: "honeypot_visitors";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      site_security_admin_audit: {
+        Row: {
+          action: string;
+          administrator_id: string | null;
+          created_at: string;
+          details: Json;
+          event_id: string | null;
+          id: string;
+          new_status: string;
+          previous_status: string | null;
+          visitor_id: string | null;
+        };
+        Insert: {
+          action: string;
+          administrator_id?: string | null;
+          created_at?: string;
+          details?: Json;
+          event_id?: string | null;
+          id?: string;
+          new_status: string;
+          previous_status?: string | null;
+          visitor_id?: string | null;
+        };
+        Update: {
+          action?: string;
+          administrator_id?: string | null;
+          created_at?: string;
+          details?: Json;
+          event_id?: string | null;
+          id?: string;
+          new_status?: string;
+          previous_status?: string | null;
+          visitor_id?: string | null;
+        };
+        Relationships: [];
       };
       profiles: {
         Row: {
@@ -902,6 +1036,59 @@ export type Database = {
       honeypot_hosts_match_zone: {
         Args: { p_visitor_id: string; p_zone_hostname: string };
         Returns: boolean;
+      };
+      record_site_security_event: {
+        Args: {
+          p_category: string;
+          p_correlation_id: string;
+          p_dedupe_key: string;
+          p_event_type: string;
+          p_http_status: number;
+          p_observed_requests: number;
+          p_request_method: string;
+          p_risk_score: number;
+          p_route: string;
+          p_severity: string;
+          p_signals: Json;
+          p_source_hash: string;
+          p_window_started_at: string;
+        };
+        Returns: string;
+      };
+      site_security_overview: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
+      site_security_dashboard: {
+        Args: {
+          p_from: string;
+          p_to: string;
+        };
+        Returns: Json;
+      };
+      review_site_security_events: {
+        Args: {
+          p_administrator_id: string;
+          p_event_ids: string[];
+          p_review_status: string;
+        };
+        Returns: number;
+      };
+      review_site_security_visitor: {
+        Args: {
+          p_administrator_id: string;
+          p_review_status: string;
+          p_visitor_id: string;
+        };
+        Returns: boolean;
+      };
+      purge_site_security_admin_audit: {
+        Args: Record<PropertyKey, never>;
+        Returns: number;
+      };
+      purge_site_security_events: {
+        Args: Record<PropertyKey, never>;
+        Returns: number;
       };
     };
     Enums: {

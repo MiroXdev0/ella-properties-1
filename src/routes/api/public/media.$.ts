@@ -9,7 +9,7 @@ const IMAGE_PATH = /\.(jpe?g|png|webp|avif)$/i;
 export const Route = createFileRoute("/api/public/media/$")({
   server: {
     handlers: {
-      GET: async ({ params }) => {
+      GET: async ({ params, request }) => {
         let path = "";
         try {
           path = decodeURIComponent((params as { _splat?: string })._splat ?? "");
@@ -21,8 +21,12 @@ export const Route = createFileRoute("/api/public/media/$")({
         }
 
         const { supabase } = await import("@/integrations/supabase/client");
+        const requestedWidth = Number(new URL(request.url).searchParams.get("w"));
+        const imageWidth = [320, 480, 640, 960, 1280].includes(requestedWidth)
+          ? requestedWidth
+          : 1280;
         const downloadOptions = IMAGE_PATH.test(path)
-          ? { transform: { width: 1280, quality: 75 } }
+          ? { transform: { width: imageWidth, quality: 75 } }
           : undefined;
 
         let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -69,7 +73,3 @@ export const Route = createFileRoute("/api/public/media/$")({
     },
   },
 });
-
-
-
-

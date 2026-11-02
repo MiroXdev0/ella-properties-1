@@ -250,7 +250,6 @@ export const Route = createFileRoute("/properties/$id")({
     };
   },
   pendingComponent: PropertyPending,
-  notFoundComponent: PropertyNotFound,
   component: PropertyDetail,
 });
 
@@ -269,22 +268,6 @@ function PropertyPending() {
   );
 }
 
-function PropertyNotFound() {
-  const { t } = useLanguage();
-  return (
-    <main className="mx-auto flex min-h-[60vh] max-w-xl flex-col items-center justify-center px-4 text-center">
-      <LanguageSwitcher className="mb-6" />
-      <h1 className="font-display text-3xl text-navy">{t("property.notFound")}</h1>
-      <p className="mt-3 text-muted-foreground">{t("property.notFoundDescription")}</p>
-      <Button asChild className="mt-6 rounded-full bg-navy text-white hover:bg-navy-deep">
-        <Link to="/" hash="catalog">
-          {t("property.allProperties")}
-        </Link>
-      </Button>
-    </main>
-  );
-}
-
 function PropertyDetail() {
   const p = Route.useLoaderData();
   const { language, t } = useLanguage();
@@ -293,6 +276,7 @@ function PropertyDetail() {
   const [active, setActive] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
+  const [failedMedia, setFailedMedia] = useState<Set<string>>(() => new Set());
   const pointerStart = useRef<{ x: number; y: number } | null>(null);
   const suppressPhotoClickUntil = useRef(0);
 
@@ -357,7 +341,7 @@ function PropertyDetail() {
         </p>
 
         {/* Gallery */}
-        {current && (
+        {current ? (
           <div className="mt-6 overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm">
             <div
               role="group"
@@ -410,7 +394,15 @@ function PropertyDetail() {
                   controls
                   playsInline
                   className="h-full w-full object-contain"
+                  onError={() => setFailedMedia((previous) => new Set(previous).add(current.url))}
                 />
+              ) : failedMedia.has(current.url) ? (
+                <div
+                  className="absolute inset-0 grid place-items-center px-6 text-center text-sm text-muted-foreground"
+                  role="status"
+                >
+                  {t("property.imageUnavailable")}
+                </div>
               ) : (
                 <button
                   type="button"
@@ -430,6 +422,7 @@ function PropertyDetail() {
                     decoding="async"
                     fetchPriority={active === 0 ? "high" : "auto"}
                     className="h-full w-full select-none object-cover"
+                    onError={() => setFailedMedia((previous) => new Set(previous).add(current.url))}
                   />
                   <span className="absolute right-3 top-3 grid h-11 w-11 place-items-center rounded-full bg-navy/80 text-white opacity-0 shadow-md transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
                     <ZoomIn className="h-5 w-5" aria-hidden="true" />
@@ -485,7 +478,12 @@ function PropertyDetail() {
                         playsInline
                         preload="none"
                         className="h-full w-full object-cover"
+                        onError={() => setFailedMedia((previous) => new Set(previous).add(m.url))}
                       />
+                    ) : failedMedia.has(m.url) ? (
+                      <span className="grid h-full place-items-center bg-slate-100 px-1 text-[10px] text-muted-foreground">
+                        {t("property.imageUnavailable")}
+                      </span>
                     ) : (
                       <img
                         src={m.url}
@@ -493,6 +491,7 @@ function PropertyDetail() {
                         loading="lazy"
                         decoding="async"
                         className="h-full w-full object-cover"
+                        onError={() => setFailedMedia((previous) => new Set(previous).add(m.url))}
                       />
                     )}
                   </button>
@@ -527,13 +526,20 @@ function PropertyDetail() {
                   }}
                 >
                   <div className="grid min-h-full min-w-full place-items-center">
-                    {current?.kind === "image" ? (
+                    {current?.kind === "image" && failedMedia.has(current.url) ? (
+                      <div className="px-6 text-center text-sm text-white/75" role="status">
+                        {t("property.imageUnavailable")}
+                      </div>
+                    ) : current?.kind === "image" ? (
                       <img
                         src={current.url}
                         alt={p.title}
                         draggable={false}
                         className="max-h-[calc(100dvh-10rem)] max-w-[calc(100vw-2rem)] select-none object-contain transition-transform duration-150 ease-out sm:max-w-[calc(100vw-6rem)]"
                         style={{ transform: `scale(${zoom})` }}
+                        onError={() =>
+                          setFailedMedia((previous) => new Set(previous).add(current.url))
+                        }
                       />
                     ) : current?.kind === "video" ? (
                       <video
@@ -564,6 +570,43 @@ function PropertyDetail() {
                       <ChevronRight className="h-6 w-6" aria-hidden="true" />
                     </button>
                   </>
+                )}
+                {hasMultipleMedia && (
+                  <div className="absolute bottom-20 left-1/2 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 gap-2 overflow-x-auto rounded-xl bg-black/55 p-2 shadow-lg">
+                    {p.media.map((media, index) => (
+                      <button
+                        key={`${media.url}-${index}`}
+                        type="button"
+                        onClick={() => {
+                          setActive(index);
+                          setZoom(1);
+                        }}
+                        aria-label={t("property.media").replace("{number}", String(index + 1))}
+                        aria-current={index === active ? "true" : undefined}
+                        className={`h-12 w-16 shrink-0 overflow-hidden rounded-md border-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${
+                          index === active ? "border-gold" : "border-white/30 opacity-75"
+                        }`}
+                      >
+                        {media.kind === "video" ? (
+                          <video
+                            src={media.url}
+                            muted
+                            playsInline
+                            preload="none"
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <img
+                            src={media.url}
+                            alt=""
+                            loading="lazy"
+                            decoding="async"
+                            className="h-full w-full object-cover"
+                          />
+                        )}
+                      </button>
+                    ))}
+                  </div>
                 )}
                 <div className="absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/50 p-2 shadow-lg">
                   <button
@@ -604,6 +647,10 @@ function PropertyDetail() {
                 </div>
               </DialogContent>
             </Dialog>
+          </div>
+        ) : (
+          <div className="mt-6 grid aspect-[16/10] place-items-center rounded-xl bg-muted text-sm text-muted-foreground">
+            {t("property.noImages")}
           </div>
         )}
 

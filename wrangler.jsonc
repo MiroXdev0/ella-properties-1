@@ -4,6 +4,11 @@
   "compatibility_date": "2026-10-11",
   "compatibility_flags": ["nodejs_compat"],
   "main": "src/server.ts",
+  "vars": {
+    "HONEYPOT_ENFORCEMENT_MODE": "worker_only",
+    "SUPABASE_URL": "https://yvcpreaeogrpmzwrcfjs.supabase.co",
+    "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_KO8eY9tZHMoBsCM_NxyBGw_i4TMaGhG",
+  },
   "triggers": {
     "crons": ["*/5 * * * *"],
   },

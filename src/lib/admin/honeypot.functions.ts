@@ -1,10 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
-import type { Database } from "@/integrations/supabase/types";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireSecurityMonitorAdmin } from "@/lib/admin/security-authorization.server";
 
 const eventStatuses = [
   "new",
@@ -18,26 +17,6 @@ const ipSchema = z.string().ip();
 const zoneHostnameSchema = z
   .string()
   .regex(/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/);
-
-type AdminContext = {
-  supabase: SupabaseClient<Database>;
-  userId: string;
-};
-
-async function requireHoneypotAdmin(context: AdminContext): Promise<void> {
-  const { data, error } = await context.supabase
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", context.userId)
-    .eq("role", "admin")
-    .maybeSingle();
-
-  if (error) {
-    console.error("[honeypot] Administrator authorization check failed");
-    throw new Response("Unable to verify administrator access", { status: 500 });
-  }
-  if (!data) throw new Response("Administrator access required", { status: 403 });
-}
 
 function assertQuerySucceeded(error: { message: string } | null, message: string): void {
   if (error) {
@@ -61,8 +40,9 @@ export const getHoneypotOverview = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .validator((data: unknown) => overviewSchema.parse(data))
   .handler(async ({ context }) => {
-    await requireHoneypotAdmin(context);
+    await requireSecurityMonitorAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { resolveHoneypotEnforcementMode } = await import("@/lib/honeypot/restriction-policy");
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
     const [events, visitors, restrictions, investigation, lastDay, volume] = await Promise.all([
@@ -93,6 +73,15 @@ export const getHoneypotOverview = createServerFn({ method: "GET" })
     ].find(Boolean);
     assertQuerySucceeded(firstError ?? null, "Unable to load honeypot overview");
 
+    const enforcementMode = resolveHoneypotEnforcementMode(process.env.HONEYPOT_ENFORCEMENT_MODE);
+    const enforcementConfigured =
+      enforcementMode === "worker_only" ||
+      Boolean(
+        process.env.CLOUDFLARE_API_TOKEN &&
+        process.env.CLOUDFLARE_ZONE_ID &&
+        process.env.CLOUDFLARE_ZONE_HOSTNAME,
+      );
+
     return {
       totalEvents: events.count ?? 0,
       uniqueSources: visitors.count ?? 0,
@@ -103,11 +92,8 @@ export const getHoneypotOverview = createServerFn({ method: "GET" })
       captureConfigured: Boolean(
         process.env.HONEYPOT_HASH_SECRET && process.env.HONEYPOT_HASH_SECRET.length >= 32,
       ),
-      enforcementConfigured: Boolean(
-        process.env.CLOUDFLARE_API_TOKEN &&
-        process.env.CLOUDFLARE_ZONE_ID &&
-        process.env.CLOUDFLARE_ZONE_HOSTNAME,
-      ),
+      enforcementMode,
+      enforcementConfigured,
     };
   });
 
@@ -130,7 +116,7 @@ export const getHoneypotEvents = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .validator((data: unknown) => listEventsSchema.parse(data))
   .handler(async ({ data, context }) => {
-    await requireHoneypotAdmin(context);
+    await requireSecurityMonitorAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const start = (data.page - 1) * data.pageSize;
     const select =
@@ -200,12 +186,12 @@ export const getHoneypotInvestigation = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .validator((data: unknown) => investigationSchema.parse(data))
   .handler(async ({ data, context }) => {
-    await requireHoneypotAdmin(context);
+    await requireSecurityMonitorAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: visitor, error: visitorError } = await supabaseAdmin
       .from("honeypot_visitors")
       .select(
-        "id, ip_address, country, country_code, city, region, operating_system, browser, browser_version, device_type, asn, as_organization, hosting_classification, user_agent, metadata_sources, identity_purged_at, is_trusted, first_seen, last_seen, request_count, updated_at",
+        "id, ip_address, country, country_code, city, region, operating_system, browser, browser_version, device_type, asn, as_organization, hosting_classification, user_agent, metadata_sources, identity_purged_at, is_trusted, first_seen, last_seen, request_count, updated_at, review_status, reviewed_by, reviewed_at",
       )
       .eq("id", data.visitorId)
       .maybeSingle();
@@ -214,61 +200,117 @@ export const getHoneypotInvestigation = createServerFn({ method: "GET" })
 
     const pageSize = 100;
     const offset = (data.page - 1) * pageSize;
-    const [activity, notes, audit, restrictions, latestEvent] = await Promise.all([
-      supabaseAdmin
-        .from("honeypot_activity")
-        .select(
-          "id, occurred_at, event:honeypot_events!honeypot_activity_event_visitor_fkey!inner(id, detected_at, detection_reason, hostname, endpoint, request_method, referrer, user_agent, status)",
-          { count: "exact" },
-        )
-        .eq("visitor_id", data.visitorId)
-        .order("occurred_at", { ascending: false })
-        .range(offset, offset + pageSize - 1),
-      supabaseAdmin
-        .from("honeypot_admin_notes")
-        .select("id, event_id, administrator_id, note, created_at")
-        .eq("visitor_id", data.visitorId)
-        .order("created_at", { ascending: false })
-        .limit(100),
-      supabaseAdmin
-        .from("honeypot_admin_audit")
-        .select(
-          "id, event_id, restriction_id, administrator_id, action, outcome, details, created_at",
-        )
-        .eq("visitor_id", data.visitorId)
-        .order("created_at", { ascending: false })
-        .limit(100),
-      supabaseAdmin
-        .from("honeypot_ip_restrictions")
-        .select(
-          "id, ip_address, cloudflare_rule_id, status, duration, reason, administrator_id, created_at, expires_at, released_at, updated_at",
-        )
-        .eq("visitor_id", data.visitorId)
-        .order("created_at", { ascending: false })
-        .limit(50),
-      supabaseAdmin
-        .from("honeypot_events")
-        .select("referrer")
-        .eq("visitor_id", data.visitorId)
-        .order("detected_at", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-    ]);
+    const [activity, notes, audit, restrictions, latestEvent, securityActivity, securityAudit] =
+      await Promise.all([
+        supabaseAdmin
+          .from("honeypot_activity")
+          .select(
+            "id, occurred_at, event:honeypot_events!honeypot_activity_event_visitor_fkey!inner(id, detected_at, detection_reason, hostname, endpoint, request_method, referrer, user_agent, status)",
+            { count: "exact" },
+          )
+          .eq("visitor_id", data.visitorId)
+          .order("occurred_at", { ascending: false })
+          .range(offset, offset + pageSize - 1),
+        supabaseAdmin
+          .from("honeypot_admin_notes")
+          .select("id, event_id, administrator_id, note, created_at", { count: "exact" })
+          .eq("visitor_id", data.visitorId)
+          .order("created_at", { ascending: false })
+          .range(offset, offset + pageSize - 1),
+        supabaseAdmin
+          .from("honeypot_admin_audit")
+          .select(
+            "id, event_id, restriction_id, administrator_id, action, outcome, details, created_at",
+            { count: "exact" },
+          )
+          .eq("visitor_id", data.visitorId)
+          .order("created_at", { ascending: false })
+          .range(offset, offset + pageSize - 1),
+        supabaseAdmin
+          .from("honeypot_ip_restrictions")
+          .select(
+            "id, ip_address, cloudflare_rule_id, enforcement_mode, status, duration, reason, administrator_id, created_at, expires_at, released_at, updated_at, last_verified_at",
+          )
+          .eq("visitor_id", data.visitorId)
+          .order("created_at", { ascending: false })
+          .limit(50),
+        supabaseAdmin
+          .from("honeypot_events")
+          .select("referrer")
+          .eq("visitor_id", data.visitorId)
+          .order("detected_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabaseAdmin
+          .from("site_security_events")
+          .select(
+            "id, category, event_type, severity, risk_score, request_method, route, http_status, signals, first_seen, last_seen, occurrence_count, observed_requests",
+            { count: "exact" },
+          )
+          .eq("visitor_id", data.visitorId)
+          .order("last_seen", { ascending: false })
+          .range(offset, offset + pageSize - 1),
+        supabaseAdmin
+          .from("site_security_admin_audit")
+          .select(
+            "id, administrator_id, event_id, action, previous_status, new_status, created_at",
+            { count: "exact" },
+          )
+          .eq("visitor_id", data.visitorId)
+          .order("created_at", { ascending: false })
+          .range(offset, offset + pageSize - 1),
+      ]);
     assertQuerySucceeded(
       activity.error ?? notes.error ?? audit.error ?? restrictions.error ?? latestEvent.error,
       "Unable to load visitor activity",
     );
+    if (securityActivity.error || securityAudit.error) {
+      console.error("[security-monitor] Unable to load related visitor activity");
+    }
+    const { resolveHoneypotEnforcementMode } = await import("@/lib/honeypot/restriction-policy");
+    const enforcementMode = resolveHoneypotEnforcementMode(process.env.HONEYPOT_ENFORCEMENT_MODE);
 
     return {
+      enforcementMode,
+      enforcementConfigured:
+        enforcementMode === "worker_only" ||
+        Boolean(
+          process.env.CLOUDFLARE_API_TOKEN &&
+          process.env.CLOUDFLARE_ZONE_ID &&
+          process.env.CLOUDFLARE_ZONE_HOSTNAME,
+        ),
       visitor,
       activity: activity.data ?? [],
       activityTotal: activity.count ?? 0,
       activityPage: data.page,
       activityPageSize: pageSize,
       notes: notes.data ?? [],
+      notesTotal: notes.count ?? 0,
       audit: audit.data ?? [],
+      auditTotal: audit.count ?? 0,
       restrictions: restrictions.data ?? [],
       latestReferrer: latestEvent.data?.referrer ?? null,
+      securityActivity: securityActivity.data ?? [],
+      securityActivityTotal: securityActivity.count ?? 0,
+      securityAudit: securityAudit.data ?? [],
+      securityAuditTotal: securityAudit.count ?? 0,
+      timelineTotalEntries:
+        (activity.count ?? 0) +
+        (notes.count ?? 0) +
+        (audit.count ?? 0) +
+        (securityActivity.count ?? 0) +
+        (securityAudit.count ?? 0),
+      timelineTotalPages: Math.max(
+        1,
+        ...[
+          activity.count,
+          notes.count,
+          audit.count,
+          securityActivity.count,
+          securityAudit.count,
+        ].map((count) => Math.ceil((count ?? 0) / pageSize)),
+      ),
+      securityActivityError: Boolean(securityActivity.error || securityAudit.error),
     };
   });
 
@@ -281,7 +323,7 @@ export const updateHoneypotEventStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: unknown) => changeStatusSchema.parse(data))
   .handler(async ({ data, context }) => {
-    await requireHoneypotAdmin(context);
+    await requireSecurityMonitorAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: existing, error: findError } = await supabaseAdmin
       .from("honeypot_events")
@@ -354,7 +396,7 @@ export const addHoneypotInvestigationNote = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: unknown) => addNoteSchema.parse(data))
   .handler(async ({ data, context }) => {
-    await requireHoneypotAdmin(context);
+    await requireSecurityMonitorAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     if (data.eventId) {
@@ -424,9 +466,11 @@ export const restrictHoneypotVisitor = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: unknown) => restrictIpSchema.parse(data))
   .handler(async ({ data, context }) => {
-    await requireHoneypotAdmin(context);
+    await requireSecurityMonitorAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { getHoneypotRestrictionExpiry } = await import("@/lib/honeypot/restriction-policy");
+    const { getHoneypotRestrictionExpiry, resolveHoneypotEnforcementMode } =
+      await import("@/lib/honeypot/restriction-policy");
+    const enforcementMode = resolveHoneypotEnforcementMode(process.env.HONEYPOT_ENFORCEMENT_MODE);
     const {
       CloudflareRestrictionCleanupError,
       createCloudflareRestriction,
@@ -435,13 +479,17 @@ export const restrictHoneypotVisitor = createServerFn({ method: "POST" })
       removeCloudflareRestriction,
       verifyCloudflareZoneHostname,
     } = await import("@/lib/honeypot/cloudflare.server");
-    const zoneHostname = zoneHostnameSchema.safeParse(
-      process.env.CLOUDFLARE_ZONE_HOSTNAME?.trim().toLowerCase() ?? "",
-    );
-    if (!zoneHostname.success) {
-      throw new Response("A valid proxied Cloudflare zone hostname is required for restrictions", {
-        status: 409,
-      });
+    const zoneHostname =
+      enforcementMode === "cloudflare_zone"
+        ? zoneHostnameSchema.safeParse(
+            process.env.CLOUDFLARE_ZONE_HOSTNAME?.trim().toLowerCase() ?? "",
+          )
+        : null;
+    if (zoneHostname && !zoneHostname.success) {
+      throw new Response(
+        "A valid Cloudflare zone hostname is required for zone-level restrictions",
+        { status: 409 },
+      );
     }
     const request = getRequest();
     const currentAdminIp = request?.headers.get("cf-connecting-ip") ?? null;
@@ -456,7 +504,9 @@ export const restrictHoneypotVisitor = createServerFn({ method: "POST" })
     }
     assertRestrictionIsSafe(data.ipAddress, currentAdminIp, visitor.is_trusted);
 
-    await verifyCloudflareZoneHostname(zoneHostname.data);
+    if (enforcementMode === "cloudflare_zone" && zoneHostname?.success) {
+      await verifyCloudflareZoneHostname(zoneHostname.data);
+    }
 
     const { count: existingCount, error: existingError } = await supabaseAdmin
       .from("honeypot_ip_restrictions")
@@ -492,6 +542,7 @@ export const restrictHoneypotVisitor = createServerFn({ method: "POST" })
         created_at: now.toISOString(),
         expires_at: expiresAt,
         status: "pending",
+        enforcement_mode: enforcementMode,
       })
       .select("id")
       .single();
@@ -510,7 +561,11 @@ export const restrictHoneypotVisitor = createServerFn({ method: "POST" })
       administrator_id: context.userId,
       action: "restriction_requested",
       outcome: "pending",
-      details: { duration: data.duration, reason: data.reason },
+      details: {
+        duration: data.duration,
+        reason: data.reason,
+        enforcement_mode: enforcementMode,
+      },
     });
     if (auditResult.error) {
       await supabaseAdmin
@@ -519,6 +574,66 @@ export const restrictHoneypotVisitor = createServerFn({ method: "POST" })
         .eq("id", restriction.id);
       assertQuerySucceeded(auditResult.error, "Unable to audit the IP restriction");
       throw new Error("Unable to audit the IP restriction");
+    }
+
+    if (enforcementMode === "worker_only") {
+      const activatedAt = new Date().toISOString();
+      const { data: activatedRestriction, error: activationError } = await supabaseAdmin
+        .from("honeypot_ip_restrictions")
+        .update({ status: "active", updated_at: activatedAt })
+        .eq("id", restriction.id)
+        .eq("status", "pending")
+        .select("id")
+        .maybeSingle();
+      if (activationError || !activatedRestriction) {
+        console.error("[honeypot] Worker restriction activation could not be persisted");
+        const failedAt = new Date().toISOString();
+        const { error: failedError } = await supabaseAdmin
+          .from("honeypot_ip_restrictions")
+          .update({ status: "failed", released_at: failedAt, updated_at: failedAt })
+          .eq("id", restriction.id)
+          .eq("status", "pending");
+        const { error: auditError } = await supabaseAdmin.from("honeypot_admin_audit").insert({
+          visitor_id: data.visitorId,
+          restriction_id: restriction.id,
+          administrator_id: context.userId,
+          action: "restriction_failed",
+          outcome: "failed",
+          details: { enforcement_mode: "worker_only", phase: "activation" },
+        });
+        if (failedError || auditError) {
+          console.error("[honeypot] Worker restriction activation failure was not fully recorded");
+        }
+        throw new Error("Worker restriction could not be activated");
+      }
+
+      const { error: eventError } = await supabaseAdmin
+        .from("honeypot_events")
+        .update({ status: "restricted" })
+        .eq("visitor_id", data.visitorId)
+        .neq("status", "dismissed");
+      const { error: auditError } = await supabaseAdmin.from("honeypot_admin_audit").insert({
+        visitor_id: data.visitorId,
+        restriction_id: restriction.id,
+        administrator_id: context.userId,
+        action: "restriction_activated",
+        outcome: "success",
+        details: { duration: data.duration, enforcement_mode: "worker_only" },
+      });
+      if (eventError || auditError) {
+        console.error("[honeypot] Worker restriction is active but related records need review");
+        throw new Error("Worker restriction is active; some audit records need review");
+      }
+      return {
+        ok: true,
+        restrictionId: restriction.id,
+        expiresAt,
+        enforcementMode,
+      };
+    }
+
+    if (!zoneHostname?.success) {
+      throw new Response("Cloudflare zone configuration is required", { status: 409 });
     }
 
     let ruleId: string;
@@ -571,8 +686,10 @@ export const restrictHoneypotVisitor = createServerFn({ method: "POST" })
       .from("honeypot_ip_restrictions")
       .update({
         status: "active",
+        enforcement_mode: "cloudflare_zone",
         cloudflare_rule_id: ruleId,
         updated_at: activatedAt,
+        last_verified_at: activatedAt,
       })
       .eq("id", restriction.id)
       .eq("status", "pending")
@@ -672,13 +789,22 @@ export const restrictHoneypotVisitor = createServerFn({ method: "POST" })
       administrator_id: context.userId,
       action: "restriction_activated",
       outcome: "success",
-      details: { duration: data.duration, cloudflare_rule_id: ruleId },
+      details: {
+        duration: data.duration,
+        enforcement_mode: "cloudflare_zone",
+        cloudflare_rule_id: ruleId,
+      },
     });
     if (eventError || auditUpdateError) {
       console.error("[honeypot] IP restriction succeeded but related records need review");
       throw new Error("IP restriction is active; some audit records need review");
     }
-    return { ok: true, restrictionId: restriction.id, expiresAt };
+    return {
+      ok: true,
+      restrictionId: restriction.id,
+      expiresAt,
+      enforcementMode,
+    };
   });
 
 const verifyRestrictionSchema = z.object({
@@ -690,24 +816,46 @@ export const verifyHoneypotRestriction = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: unknown) => verifyRestrictionSchema.parse(data))
   .handler(async ({ data, context }) => {
-    await requireHoneypotAdmin(context);
+    await requireSecurityMonitorAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { verifyCloudflareRestriction, cloudflareFailureMessage } =
       await import("@/lib/honeypot/cloudflare.server");
     const { data: restriction, error: restrictionError } = await supabaseAdmin
       .from("honeypot_ip_restrictions")
-      .select("id, visitor_id, ip_address, cloudflare_rule_id, status")
+      .select("id, visitor_id, ip_address, cloudflare_rule_id, status, enforcement_mode")
       .eq("id", data.restrictionId)
       .eq("visitor_id", data.visitorId)
       .maybeSingle();
     assertQuerySucceeded(restrictionError, "Unable to load the IP restriction");
     if (!restriction) throw new Response("IP restriction not found", { status: 404 });
-    if (
-      restriction.status !== "active" ||
-      !restriction.visitor_id ||
-      !restriction.ip_address ||
-      !restriction.cloudflare_rule_id
-    ) {
+    if (restriction.status !== "active" || !restriction.visitor_id || !restriction.ip_address) {
+      return { verified: false, reason: "restriction_not_active" as const };
+    }
+
+    if (restriction.enforcement_mode === "worker_only") {
+      const { resolveHoneypotEnforcementMode } = await import("@/lib/honeypot/restriction-policy");
+      if (resolveHoneypotEnforcementMode(process.env.HONEYPOT_ENFORCEMENT_MODE) !== "worker_only") {
+        return { verified: false, reason: "worker_mode_not_configured" as const };
+      }
+      const checkedAt = new Date().toISOString();
+      const { data: updated, error: verificationError } = await supabaseAdmin
+        .from("honeypot_ip_restrictions")
+        .update({ updated_at: checkedAt, last_verified_at: checkedAt })
+        .eq("id", restriction.id)
+        .eq("status", "active")
+        .eq("enforcement_mode", "worker_only")
+        .select("id")
+        .maybeSingle();
+      assertQuerySucceeded(verificationError, "Unable to save Worker restriction check time");
+      if (!updated) {
+        throw new Response("Restriction status changed during verification; reload the record", {
+          status: 409,
+        });
+      }
+      return { verified: true, reason: "worker_enforced" as const };
+    }
+
+    if (!restriction.cloudflare_rule_id) {
       return { verified: false, reason: "restriction_not_active" as const };
     }
 
@@ -735,7 +883,10 @@ export const verifyHoneypotRestriction = createServerFn({ method: "POST" })
     if (verification.verified) {
       const { data: updated, error: verifyTimestampError } = await supabaseAdmin
         .from("honeypot_ip_restrictions")
-        .update({ updated_at: new Date().toISOString() })
+        .update({
+          updated_at: new Date().toISOString(),
+          last_verified_at: new Date().toISOString(),
+        })
         .eq("id", restriction.id)
         .eq("status", "active")
         .select("id")
@@ -790,12 +941,12 @@ export const unrestrictHoneypotVisitor = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: unknown) => unrestrictSchema.parse(data))
   .handler(async ({ data, context }) => {
-    await requireHoneypotAdmin(context);
+    await requireSecurityMonitorAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { removeCloudflareRestriction } = await import("@/lib/honeypot/cloudflare.server");
     const { data: restriction, error: findError } = await supabaseAdmin
       .from("honeypot_ip_restrictions")
-      .select("id, visitor_id, ip_address, cloudflare_rule_id, status")
+      .select("id, visitor_id, ip_address, cloudflare_rule_id, status, enforcement_mode")
       .eq("id", data.restrictionId)
       .eq("visitor_id", data.visitorId)
       .maybeSingle();
@@ -803,8 +954,8 @@ export const unrestrictHoneypotVisitor = createServerFn({ method: "POST" })
     if (!restriction || restriction.status !== "active") {
       throw new Response("This IP restriction is not active", { status: 409 });
     }
-    if (!restriction.ip_address || !restriction.cloudflare_rule_id) {
-      throw new Error("Active restriction is missing its Cloudflare rule information");
+    if (!restriction.ip_address) {
+      throw new Error("Active restriction is missing its IP address");
     }
 
     const auditResult = await supabaseAdmin.from("honeypot_admin_audit").insert({
@@ -813,8 +964,48 @@ export const unrestrictHoneypotVisitor = createServerFn({ method: "POST" })
       administrator_id: context.userId,
       action: "restriction_removal_requested",
       outcome: "pending",
+      details: { enforcement_mode: restriction.enforcement_mode },
     });
     assertQuerySucceeded(auditResult.error, "Unable to audit the restriction removal");
+
+    if (restriction.enforcement_mode === "worker_only") {
+      const removedAt = new Date().toISOString();
+      const { data: removed, error: removalError } = await supabaseAdmin
+        .from("honeypot_ip_restrictions")
+        .update({ status: "unbanned", released_at: removedAt, updated_at: removedAt })
+        .eq("id", restriction.id)
+        .eq("status", "active")
+        .eq("enforcement_mode", "worker_only")
+        .select("id")
+        .maybeSingle();
+      assertQuerySucceeded(removalError, "Unable to remove the Worker IP restriction");
+      if (!removed) {
+        throw new Response("Restriction status changed; reload the record", { status: 409 });
+      }
+
+      const { error: eventError } = await supabaseAdmin
+        .from("honeypot_events")
+        .update({ status: "confirmed_suspicious" })
+        .eq("visitor_id", data.visitorId)
+        .eq("status", "restricted");
+      const { error: auditError } = await supabaseAdmin.from("honeypot_admin_audit").insert({
+        visitor_id: data.visitorId,
+        restriction_id: restriction.id,
+        administrator_id: context.userId,
+        action: "restriction_removed",
+        outcome: "success",
+        details: { enforcement_mode: "worker_only" },
+      });
+      if (eventError || auditError) {
+        console.error("[honeypot] Worker restriction was removed but related records need review");
+        throw new Error("Worker restriction was removed; some audit records need review");
+      }
+      return { ok: true, enforcementMode: "worker_only" as const };
+    }
+
+    if (!restriction.cloudflare_rule_id) {
+      throw new Error("Active Cloudflare restriction is missing its rule information");
+    }
 
     const requestedAt = new Date().toISOString();
     const { error: pendingError } = await supabaseAdmin
@@ -854,6 +1045,7 @@ export const unrestrictHoneypotVisitor = createServerFn({ method: "POST" })
         administrator_id: context.userId,
         action: "restriction_removal_failed",
         outcome: "failed",
+        details: { enforcement_mode: "cloudflare_zone" },
       });
       if (restoreError || auditUpdateError) {
         console.error("[honeypot] Failed restriction removal state could not be fully recorded");
@@ -889,5 +1081,5 @@ export const unrestrictHoneypotVisitor = createServerFn({ method: "POST" })
       console.error("[honeypot] Restriction removed but related records need review");
       throw new Error("IP restriction was removed; some audit records need review");
     }
-    return { ok: true };
+    return { ok: true, enforcementMode: "cloudflare_zone" as const };
   });

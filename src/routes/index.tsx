@@ -49,7 +49,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { ShareProperty } from "@/components/property/ShareProperty";
+import { PropertyCard } from "@/components/property/PropertyCard";
 import { cn } from "@/lib/utils";
 
 import heroImage from "@/assets/hero-1920.webp";
@@ -1147,7 +1147,7 @@ function Catalog({
         ) : (
           <div className="mt-4 grid gap-5 sm:gap-7 md:grid-cols-2">
             {filtered.map((p) => (
-              <PropertyCard key={p.id} p={p} />
+              <PropertyCard key={p.id} property={p} />
             ))}
           </div>
         )}
@@ -1418,104 +1418,6 @@ function FilterSelect({
         </SelectContent>
       </Select>
     </div>
-  );
-}
-
-function PropertyCard({ p }: { p: Property }) {
-  const { language, t } = useLanguage();
-  const translate = useTranslateContent();
-  const priceText = new Intl.NumberFormat(language === "en" ? "en-GB" : "bg-BG", {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 0,
-  }).format(p.price);
-  return (
-    <article className="property-card group relative flex flex-col overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm">
-      <Link
-        to="/properties/$id"
-        params={{ id: p.id }}
-        aria-label={`${t("property.more")}: ${p.title}`}
-        className="absolute inset-0 z-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold"
-      >
-        <span className="sr-only">
-          {t("property.more")}: {p.title}
-        </span>
-      </Link>
-      <div className="pointer-events-none relative z-10 aspect-[16/10] overflow-hidden bg-muted">
-        {p.image ? (
-          <img
-            src={p.image}
-            alt={p.city ? `${p.title} в ${p.city}` : p.title}
-            loading="lazy"
-            decoding="async"
-            width={1024}
-            height={768}
-            className="property-card-image h-full w-full object-cover"
-          />
-        ) : (
-          <div className="h-full w-full bg-muted" aria-hidden="true" />
-        )}
-        <span className="absolute left-4 top-4 rounded-md bg-navy/95 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wider text-white">
-          {translate(p.listing)}
-        </span>
-        <span className="absolute right-4 top-4 rounded-md bg-gold px-3 py-1.5 text-[11px] font-medium uppercase tracking-wider text-navy-deep">
-          {translate(p.type)}
-        </span>
-      </div>
-      <div className="pointer-events-none relative z-10 flex flex-1 flex-col p-5 sm:p-6">
-        <div className="flex items-baseline justify-between gap-3">
-          <h3 className="line-clamp-2 font-display text-xl font-medium leading-tight text-navy">
-            {p.title}
-          </h3>
-        </div>
-        <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
-          <MapPin className="h-3.5 w-3.5" /> {p.city}
-          {p.district ? `, ${p.district}` : ""}
-        </p>
-        {p.description && (
-          <p className="mt-3 line-clamp-2 whitespace-pre-line text-sm leading-relaxed text-foreground/75">
-            {p.description.replace(/\s+/g, " ").trim().slice(0, 180)}
-          </p>
-        )}
-        {p.area > 0 && Number.isFinite(p.area) && (
-          <div className="mt-5 flex flex-wrap gap-4 border-t border-border pt-4 text-xs text-muted-foreground">
-            <span className="inline-flex items-center gap-1.5">
-              <Maximize2 className="h-3.5 w-3.5 text-gold" /> {p.area} м²
-            </span>
-          </div>
-        )}
-        <div className="mt-auto flex flex-wrap items-end justify-between gap-3 pt-5">
-          <div>
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
-              {t("property.price")}
-            </div>
-            <div className="font-display text-2xl font-semibold tabular-nums text-navy">
-              {p.price > 0 && Number.isFinite(p.price) ? priceText : t("property.priceOnRequest")}
-              {p.price > 0 && p.listing === "Наем" && (
-                <span className="text-sm text-muted-foreground"> {t("property.month")}</span>
-              )}
-            </div>
-          </div>
-          <div className="pointer-events-auto relative z-10 flex flex-wrap justify-end gap-2">
-            <Button asChild variant="outline" size="sm" className="min-h-11 rounded-full">
-              <Link to="/properties/$id" params={{ id: p.id }}>
-                {t("property.more")}
-              </Link>
-            </Button>
-            <Button
-              asChild
-              size="sm"
-              className="min-h-11 rounded-full bg-navy text-white hover:bg-navy-deep"
-            >
-              <a href={`/?inquiry=${encodeURIComponent(p.title)}#contact`}>
-                {t("property.viewing")}
-              </a>
-            </Button>
-            <ShareProperty property={p} compact />
-          </div>
-        </div>
-      </div>
-    </article>
   );
 }
 

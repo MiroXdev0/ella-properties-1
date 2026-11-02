@@ -13,11 +13,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { restrictHoneypotVisitor } from "@/lib/admin/honeypot.functions";
+import type { HoneypotEnforcementMode } from "@/lib/honeypot/restriction-policy";
 
 type Props = {
   visitorId: string;
   ipAddress: string | null;
   isTrusted: boolean;
+  enforcementMode?: HoneypotEnforcementMode;
   reason?: string;
   disabled?: boolean;
 };
@@ -33,6 +35,7 @@ export function HoneypotRestrictionDialog({
   visitorId,
   ipAddress,
   isTrusted,
+  enforcementMode,
   reason: initialReason,
   disabled = false,
 }: Props) {
@@ -80,7 +83,9 @@ export function HoneypotRestrictionDialog({
         title={
           isTrusted || !ipAddress
             ? "This address cannot be restricted"
-            : "Review and restrict this IP at Cloudflare"
+            : enforcementMode === "worker_only"
+              ? "Review and restrict this IP at the Worker"
+              : "Review and restrict this IP with Cloudflare"
         }
       >
         <ShieldBan className="mr-1.5 h-4 w-4" aria-hidden="true" />
@@ -88,10 +93,16 @@ export function HoneypotRestrictionDialog({
       </Button>
       <AlertDialogContent className="max-h-[90vh] overflow-y-auto sm:rounded-2xl">
         <AlertDialogHeader>
-          <AlertDialogTitle>Apply a Cloudflare IP restriction?</AlertDialogTitle>
+          <AlertDialogTitle>
+            {enforcementMode === "worker_only"
+              ? "Apply a Worker-only IP restriction?"
+              : "Apply a Cloudflare zone IP restriction?"}
+          </AlertDialogTitle>
           <AlertDialogDescription>
-            This changes the live zone IP Access Rules. The rule is verified with Cloudflare before
-            it is shown as active. Your current IP and configured trusted addresses are protected.
+            {enforcementMode === "worker_only"
+              ? "Requests from this IP that reach this Worker will be blocked. Traffic that bypasses this Worker is not covered. The restriction record must be saved before it is shown as active."
+              : "This changes the live zone IP Access Rules. The rule is verified with Cloudflare before it is shown as active."}{" "}
+            Your current IP and configured trusted addresses are protected.
           </AlertDialogDescription>
         </AlertDialogHeader>
 

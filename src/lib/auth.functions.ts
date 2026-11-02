@@ -1,9 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { createClient } from "@supabase/supabase-js";
+import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 
 import type { Database } from "@/integrations/supabase/types";
 import { SITE_URL } from "@/lib/seo";
+import { markSecuritySignal } from "@/lib/security-monitoring";
 
 const signUpSchema = z.object({
   email: z.string().trim().email().max(255),
@@ -75,6 +77,7 @@ export const publicSignUp = createServerFn({ method: "POST" })
     });
 
     if (error) {
+      markSecuritySignal(getRequest(), "registration_failed");
       console.error("[publicSignUp]", error.message);
       if (error.code === "user_already_exists") {
         return { ok: false as const, reason: "exists" as const };

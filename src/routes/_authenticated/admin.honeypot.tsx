@@ -1,4 +1,4 @@
-import { useDeferredValue, useState } from "react";
+import { useDeferredValue, useEffect, useState } from "react";
 import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -134,14 +134,20 @@ function HoneypotMonitor() {
     enabled: isAdmin && !dateRangeInvalid,
   });
 
-  if (!isAdmin) return <Navigate to="/admin" />;
-
   const overview = overviewQuery.data;
   const events = eventsQuery.data?.events ?? [];
   const protectedVisitorIds = new Set(eventsQuery.data?.protectedVisitorIds ?? []);
   const total = eventsQuery.data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / 25));
   const activeFilters = Boolean(search || status || countryCode || fromDate || toDate);
+
+  useEffect(() => {
+    if (!eventsQuery.data) return;
+    const lastPage = Math.max(1, Math.ceil(eventsQuery.data.total / 25));
+    if (page > lastPage) setPage(lastPage);
+  }, [eventsQuery.data, page]);
+
+  if (!isAdmin) return <Navigate to="/admin" />;
 
   function resetFilters() {
     setSearch("");
@@ -198,8 +204,10 @@ function HoneypotMonitor() {
             />
             <span className="text-slate-600">
               {overview?.enforcementConfigured
-                ? "Cloudflare settings present; verified per action"
-                : "Zone ID, hostname, and API token required"}
+                ? overview.enforcementMode === "worker_only"
+                  ? "Worker-only enforcement enabled"
+                  : "Cloudflare zone settings present"
+                : "Configure restriction enforcement"}
             </span>
           </div>
         </div>
@@ -313,10 +321,9 @@ function HoneypotMonitor() {
               Location, browser, or network provider alone never triggers an automatic restriction.
             </p>
             <p className="mt-3 text-sm leading-relaxed text-white/75">
-              Restrictions are refused unless every recorded request for a source used a hostname
-              within the configured zone, and Cloudflare confirms that the zone ID matches it.
-              Cloudflare zone rules do not cover <code>workers.dev</code>, so uncovered hostnames
-              also check active restrictions at the Worker before serving the site.
+              Worker-only restrictions are checked against the database for requests reaching this
+              Worker. They do not block traffic that bypasses it. Cloudflare zone rules require a
+              custom zone and apply at the edge.
             </p>
           </div>
           <div className="mt-5 border-t border-white/15 pt-4 text-xs leading-relaxed text-white/55">
@@ -601,8 +608,9 @@ function HoneypotMonitor() {
                               visitorId={visitor.id}
                               ipAddress={visitor.ip_address}
                               isTrusted={visitor.is_trusted}
+                              enforcementMode={overview?.enforcementMode}
                               reason={event.detection_reason}
-                              disabled={alreadyRestricted}
+                              disabled={alreadyRestricted || !overview?.enforcementConfigured}
                             />
                           </div>
                         </td>
@@ -654,8 +662,9 @@ function HoneypotMonitor() {
                         visitorId={visitor.id}
                         ipAddress={visitor.ip_address}
                         isTrusted={visitor.is_trusted}
+                        enforcementMode={overview?.enforcementMode}
                         reason={event.detection_reason}
-                        disabled={alreadyRestricted}
+                        disabled={alreadyRestricted || !overview?.enforcementConfigured}
                       />
                     </div>
                   </article>
