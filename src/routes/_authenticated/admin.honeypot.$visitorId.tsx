@@ -15,6 +15,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   Unplug,
+  RefreshCw,
 } from "lucide-react";
 
 import { HoneypotRestrictionDialog } from "@/components/admin/HoneypotRestrictionDialog";
@@ -34,6 +35,7 @@ import {
   getHoneypotInvestigation,
   unrestrictHoneypotVisitor,
   updateHoneypotEventStatus,
+  verifyHoneypotRestriction,
 } from "@/lib/admin/honeypot.functions";
 import type { Json } from "@/integrations/supabase/types";
 
@@ -61,6 +63,22 @@ const statusClass: Record<string, string> = {
   restricted: "bg-rose-50 text-rose-950 ring-rose-200",
   dismissed: "bg-slate-100 text-slate-700 ring-slate-200",
 };
+
+const restrictionStatusLabels: Record<string, string> = {
+  pending: "Pending",
+  pending_removal: "Pending removal",
+  active: "Active · last verified",
+  failed: "Failed",
+  expired: "Expired",
+  unbanned: "Removed",
+};
+
+function restrictionStatusClass(status: string): string {
+  if (status === "active") return "bg-rose-50 text-rose-900";
+  if (status === "failed") return "bg-rose-50 text-rose-900";
+  if (status === "pending" || status === "pending_removal") return "bg-amber-50 text-amber-950";
+  return "bg-slate-100 text-slate-700";
+}
 
 function formatDate(value: string | null | undefined): string {
   if (!value) return "Unavailable";
@@ -138,6 +156,9 @@ function HoneypotInvestigation() {
   const [noteError, setNoteError] = useState("");
   const [actionError, setActionError] = useState("");
   const [unbanRestrictionId, setUnbanRestrictionId] = useState<string | null>(null);
+  const [verificationResults, setVerificationResults] = useState<
+    Record<string, { verified: boolean; reason: string }>
+  >({});
   const queryClient = useQueryClient();
   const queryKey = ["honeypot", "visitor", visitorId, activityPage];
   const investigationQuery = useQuery({
@@ -179,6 +200,15 @@ function HoneypotInvestigation() {
     onSuccess: async () => {
       setUnbanRestrictionId(null);
       setActionError("");
+      await invalidateVisitor();
+    },
+    onError: (error) => setActionError(error.message),
+  });
+  const verificationMutation = useMutation({
+    mutationFn: (restrictionId: string) =>
+      verifyHoneypotRestriction({ data: { visitorId, restrictionId } }),
+    onSuccess: async (result, restrictionId) => {
+      setVerificationResults((current) => ({ ...current, [restrictionId]: result }));
       await invalidateVisitor();
     },
     onError: (error) => setActionError(error.message),
@@ -589,14 +619,20 @@ function HoneypotInvestigation() {
                               "Address retained only while restriction is active"}
                           </span>
                           <span
-                            className={`rounded-full px-2.5 py-1 text-xs font-medium ${restriction.status === "active" ? "bg-rose-50 text-rose-900" : restriction.status === "pending" || restriction.status === "pending_removal" ? "bg-amber-50 text-amber-950" : "bg-slate-100 text-slate-700"}`}
+                            className={`rounded-full px-2.5 py-1 text-xs font-medium ${restrictionStatusClass(restriction.status)}`}
                           >
-                            {restriction.status.replaceAll("_", " ")}
+                            {restrictionStatusLabels[restriction.status] ??
+                              restriction.status.replaceAll("_", " ")}
                           </span>
                         </div>
                         <p className="mt-2 text-sm leading-relaxed text-slate-700">
                           {restriction.reason}
                         </p>
+                        {restriction.status === "active" && (
+                          <p className="mt-1 text-xs text-slate-500">
+                            Cloudflare last confirmed {formatDate(restriction.updated_at)}
+                          </p>
+                        )}
                         <p className="mt-2 text-xs text-slate-500">
                           {restriction.duration.replaceAll("_", " ")} · created{" "}
                           {formatDate(restriction.created_at)}
@@ -608,18 +644,55 @@ function HoneypotInvestigation() {
                             : ""}
                         </p>
                         {restriction.status === "active" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="mt-3 min-h-10"
-                            onClick={() => {
-                              setActionError("");
-                              setUnbanRestrictionId(restriction.id);
-                            }}
-                          >
-                            <Unplug className="mr-2 h-4 w-4" aria-hidden="true" />
-                            Unban this IP
-                          </Button>
+                          <>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="min-h-10"
+                                disabled={verificationMutation.isPending}
+                                onClick={() => {
+                                  setActionError("");
+                                  verificationMutation.mutate(restriction.id);
+                                }}
+                              >
+                                {verificationMutation.isPending &&
+                                verificationMutation.variables === restriction.id ? (
+                                  <LoaderCircle
+                                    className="mr-2 h-4 w-4 animate-spin"
+                                    aria-hidden="true"
+                                  />
+                                ) : (
+                                  <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
+                                )}
+                                Verify enforcement
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="min-h-10"
+                                onClick={() => {
+                                  setActionError("");
+                                  setUnbanRestrictionId(restriction.id);
+                                }}
+                              >
+                                <Unplug className="mr-2 h-4 w-4" aria-hidden="true" />
+                                Unban this IP
+                              </Button>
+                            </div>
+                            {verificationResults[restriction.id] && (
+                              <p
+                                role="status"
+                                className={`mt-2 text-sm ${verificationResults[restriction.id].verified ? "text-emerald-800" : "text-rose-800"}`}
+                              >
+                                {verificationResults[restriction.id].verified
+                                  ? "Cloudflare confirms a block rule for this IP in the configured zone. The Worker also enforces restrictions on workers.dev."
+                                  : verificationResults[restriction.id].reason === "missing"
+                                    ? "Cloudflare no longer has the expected rule. This restriction was marked failed."
+                                    : "Cloudflare's rule does not match the expected IP, action, or restriction record. This restriction was marked failed."}
+                              </p>
+                            )}
+                          </>
                         )}
                       </li>
                     ))}

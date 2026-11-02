@@ -314,8 +314,9 @@ function HoneypotMonitor() {
             </p>
             <p className="mt-3 text-sm leading-relaxed text-white/75">
               Restrictions are refused unless every recorded request for a source used a hostname
-              within the configured zone, and Cloudflare confirms that the zone ID matches it. Zone
-              rules do not cover the default <code>workers.dev</code> hostname.
+              within the configured zone, and Cloudflare confirms that the zone ID matches it.
+              Cloudflare zone rules do not cover <code>workers.dev</code>, so uncovered hostnames
+              also check active restrictions at the Worker before serving the site.
             </p>
           </div>
           <div className="mt-5 border-t border-white/15 pt-4 text-xs leading-relaxed text-white/55">

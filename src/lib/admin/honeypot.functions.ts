@@ -15,6 +15,9 @@ const eventStatuses = [
 ] as const;
 const restrictionDurations = ["1_hour", "24_hours", "7_days", "permanent"] as const;
 const ipSchema = z.string().ip();
+const zoneHostnameSchema = z
+  .string()
+  .regex(/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/);
 
 type AdminContext = {
   supabase: SupabaseClient<Database>;
@@ -238,7 +241,7 @@ export const getHoneypotInvestigation = createServerFn({ method: "GET" })
       supabaseAdmin
         .from("honeypot_ip_restrictions")
         .select(
-          "id, ip_address, cloudflare_rule_id, status, duration, reason, administrator_id, created_at, expires_at, released_at",
+          "id, ip_address, cloudflare_rule_id, status, duration, reason, administrator_id, created_at, expires_at, released_at, updated_at",
         )
         .eq("visitor_id", data.visitorId)
         .order("created_at", { ascending: false })
@@ -423,16 +426,18 @@ export const restrictHoneypotVisitor = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await requireHoneypotAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { getHoneypotRestrictionExpiry } = await import("@/lib/honeypot/restriction-policy");
     const {
+      CloudflareRestrictionCleanupError,
       createCloudflareRestriction,
       assertRestrictionIsSafe,
+      cloudflareFailureMessage,
       removeCloudflareRestriction,
       verifyCloudflareZoneHostname,
     } = await import("@/lib/honeypot/cloudflare.server");
-    const zoneHostname = z
-      .string()
-      .regex(/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/)
-      .safeParse(process.env.CLOUDFLARE_ZONE_HOSTNAME?.trim().toLowerCase() ?? "");
+    const zoneHostname = zoneHostnameSchema.safeParse(
+      process.env.CLOUDFLARE_ZONE_HOSTNAME?.trim().toLowerCase() ?? "",
+    );
     if (!zoneHostname.success) {
       throw new Response("A valid proxied Cloudflare zone hostname is required for restrictions", {
         status: 409,
@@ -451,17 +456,6 @@ export const restrictHoneypotVisitor = createServerFn({ method: "POST" })
     }
     assertRestrictionIsSafe(data.ipAddress, currentAdminIp, visitor.is_trusted);
 
-    const { data: hostsMatchZone, error: hostnameError } = await supabaseAdmin.rpc(
-      "honeypot_hosts_match_zone",
-      { p_visitor_id: visitor.id, p_zone_hostname: zoneHostname.data },
-    );
-    assertQuerySucceeded(hostnameError, "Unable to verify Cloudflare hostname coverage");
-    if (!hostsMatchZone) {
-      throw new Response(
-        "This source accessed a hostname outside the configured Cloudflare zone; no restriction was applied",
-        { status: 409 },
-      );
-    }
     await verifyCloudflareZoneHostname(zoneHostname.data);
 
     const { count: existingCount, error: existingError } = await supabaseAdmin
@@ -475,17 +469,18 @@ export const restrictHoneypotVisitor = createServerFn({ method: "POST" })
         status: 409,
       });
     }
+    const { count: ipRestrictionCount, error: ipRestrictionError } = await supabaseAdmin
+      .from("honeypot_ip_restrictions")
+      .select("id", { count: "exact", head: true })
+      .eq("ip_address", data.ipAddress)
+      .in("status", ["pending", "active", "pending_removal"]);
+    assertQuerySucceeded(ipRestrictionError, "Unable to verify restrictions for this IP");
+    if ((ipRestrictionCount ?? 0) > 0) {
+      throw new Response("This IP already has an active or pending restriction", { status: 409 });
+    }
 
-    const durationMs: Record<(typeof restrictionDurations)[number], number | null> = {
-      "1_hour": 60 * 60 * 1000,
-      "24_hours": 24 * 60 * 60 * 1000,
-      "7_days": 7 * 24 * 60 * 60 * 1000,
-      permanent: null,
-    };
     const now = new Date();
-    const expiresAt = durationMs[data.duration]
-      ? new Date(now.getTime() + durationMs[data.duration]!).toISOString()
-      : null;
+    const expiresAt = getHoneypotRestrictionExpiry(data.duration, now);
     const restrictionResult = await supabaseAdmin
       .from("honeypot_ip_restrictions")
       .insert({
@@ -500,6 +495,9 @@ export const restrictHoneypotVisitor = createServerFn({ method: "POST" })
       })
       .select("id")
       .single();
+    if (restrictionResult.error?.code === "23505") {
+      throw new Response("This IP already has an active or pending restriction", { status: 409 });
+    }
     const restriction = requireQueryData(
       restrictionResult.data,
       restrictionResult.error,
@@ -526,11 +524,18 @@ export const restrictHoneypotVisitor = createServerFn({ method: "POST" })
     let ruleId: string;
     try {
       ruleId = await createCloudflareRestriction(data.ipAddress, restriction.id);
-    } catch {
+    } catch (error) {
+      console.error("[honeypot] Cloudflare restriction creation or verification failed", error);
       const failedAt = new Date().toISOString();
+      const cleanupError = error instanceof CloudflareRestrictionCleanupError ? error : null;
       const { error: failedError } = await supabaseAdmin
         .from("honeypot_ip_restrictions")
-        .update({ status: "failed", released_at: failedAt, updated_at: failedAt })
+        .update({
+          status: cleanupError ? "pending_removal" : "failed",
+          cloudflare_rule_id: cleanupError?.cloudflareRuleId ?? null,
+          released_at: cleanupError ? null : failedAt,
+          updated_at: failedAt,
+        })
         .eq("id", restriction.id)
         .eq("status", "pending");
       const { error: failedAuditError } = await supabaseAdmin.from("honeypot_admin_audit").insert({
@@ -539,16 +544,30 @@ export const restrictHoneypotVisitor = createServerFn({ method: "POST" })
         administrator_id: context.userId,
         action: "restriction_failed",
         outcome: "failed",
-        details: { duration: data.duration },
+        details: { duration: data.duration, cleanup_pending: Boolean(cleanupError) },
       });
       if (failedError || failedAuditError) {
         console.error("[honeypot] Failed IP restriction could not be fully recorded");
       }
-      throw new Error("Cloudflare did not verify the IP restriction; it is not shown as active");
+      if (failedError && cleanupError) {
+        try {
+          await removeCloudflareRestriction(
+            data.ipAddress,
+            restriction.id,
+            cleanupError.cloudflareRuleId,
+          );
+        } catch (cleanupError) {
+          console.error(
+            "[honeypot] Unverified Cloudflare restriction could not be recorded or removed",
+            cleanupError,
+          );
+        }
+      }
+      throw new Error(cloudflareFailureMessage(error));
     }
 
     const activatedAt = new Date().toISOString();
-    const { error: activationError } = await supabaseAdmin
+    const { data: activatedRestriction, error: activationError } = await supabaseAdmin
       .from("honeypot_ip_restrictions")
       .update({
         status: "active",
@@ -556,31 +575,66 @@ export const restrictHoneypotVisitor = createServerFn({ method: "POST" })
         updated_at: activatedAt,
       })
       .eq("id", restriction.id)
-      .eq("status", "pending");
-    if (activationError) {
+      .eq("status", "pending")
+      .select("id")
+      .maybeSingle();
+    if (activationError || !activatedRestriction) {
       console.error("[honeypot] Cloudflare restricted the IP but restriction persistence failed");
-      const { error: pendingRemovalError } = await supabaseAdmin
+      const { data: pendingRemoval, error: pendingRemovalError } = await supabaseAdmin
         .from("honeypot_ip_restrictions")
         .update({
           status: "pending_removal",
           cloudflare_rule_id: ruleId,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", restriction.id);
-      if (pendingRemovalError) {
+        .eq("id", restriction.id)
+        .select("id")
+        .maybeSingle();
+      const pendingRemovalNotTracked = pendingRemovalError || !pendingRemoval;
+      if (pendingRemovalNotTracked) {
         console.error(
           "[honeypot] Cloudflare restriction could not be tracked for automatic cleanup",
+          pendingRemovalError,
         );
-      } else {
-        try {
-          await removeCloudflareRestriction(data.ipAddress, restriction.id, ruleId);
-          await supabaseAdmin
+      }
+      let cloudflareRemovalPending = false;
+      try {
+        await removeCloudflareRestriction(data.ipAddress, restriction.id, ruleId);
+        const { data: failedState, error: cleanupStateError } = await supabaseAdmin
+          .from("honeypot_ip_restrictions")
+          .update({
+            status: "failed",
+            cloudflare_rule_id: null,
+            released_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", restriction.id)
+          .in("status", ["pending", "pending_removal"])
+          .select("id")
+          .maybeSingle();
+        if (cleanupStateError || !failedState) {
+          console.error("[honeypot] Cloudflare rule was removed but cleanup state was not saved");
+        }
+      } catch (cleanupError) {
+        cloudflareRemovalPending = true;
+        console.error("[honeypot] Cloudflare restriction cleanup is pending retry", cleanupError);
+        if (pendingRemovalNotTracked) {
+          const { data: retracked, error: trackingRetryError } = await supabaseAdmin
             .from("honeypot_ip_restrictions")
-            .update({ status: "failed", released_at: new Date().toISOString() })
+            .update({
+              status: "pending_removal",
+              cloudflare_rule_id: ruleId,
+              updated_at: new Date().toISOString(),
+            })
             .eq("id", restriction.id)
-            .eq("status", "pending_removal");
-        } catch {
-          console.error("[honeypot] Cloudflare restriction cleanup is pending automatic retry");
+            .select("id")
+            .maybeSingle();
+          if (trackingRetryError || !retracked) {
+            console.error(
+              "[honeypot] Unremoved Cloudflare rule could not be tracked for automatic retry",
+              trackingRetryError,
+            );
+          }
         }
       }
       const { error: failedAuditError } = await supabaseAdmin.from("honeypot_admin_audit").insert({
@@ -589,13 +643,21 @@ export const restrictHoneypotVisitor = createServerFn({ method: "POST" })
         administrator_id: context.userId,
         action: "restriction_failed",
         outcome: "failed",
-        details: { duration: data.duration, cleanup_pending: Boolean(pendingRemovalError) },
+        details: {
+          duration: data.duration,
+          cleanup_pending: cloudflareRemovalPending,
+          restriction_tracking_failed: Boolean(pendingRemovalNotTracked),
+        },
       });
       if (failedAuditError) console.error("[honeypot] Failed activation audit was not recorded");
       throw new Error(
-        pendingRemovalError
-          ? "Cloudflare applied the restriction, but its status could not be saved or safely removed"
-          : "Restriction activation failed; Cloudflare cleanup was attempted",
+        cloudflareRemovalPending
+          ? pendingRemovalNotTracked
+            ? "Cloudflare restriction removal is pending, but its retry state could not be saved"
+            : "Cloudflare restriction removal is pending automatic retry"
+          : pendingRemovalNotTracked
+            ? "Cloudflare restriction was removed, but the failed status could not be saved"
+            : "Restriction activation failed; Cloudflare rule was removed",
       );
     }
 
@@ -617,6 +679,105 @@ export const restrictHoneypotVisitor = createServerFn({ method: "POST" })
       throw new Error("IP restriction is active; some audit records need review");
     }
     return { ok: true, restrictionId: restriction.id, expiresAt };
+  });
+
+const verifyRestrictionSchema = z.object({
+  visitorId: z.string().uuid(),
+  restrictionId: z.string().uuid(),
+});
+
+export const verifyHoneypotRestriction = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: unknown) => verifyRestrictionSchema.parse(data))
+  .handler(async ({ data, context }) => {
+    await requireHoneypotAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { verifyCloudflareRestriction, cloudflareFailureMessage } =
+      await import("@/lib/honeypot/cloudflare.server");
+    const { data: restriction, error: restrictionError } = await supabaseAdmin
+      .from("honeypot_ip_restrictions")
+      .select("id, visitor_id, ip_address, cloudflare_rule_id, status")
+      .eq("id", data.restrictionId)
+      .eq("visitor_id", data.visitorId)
+      .maybeSingle();
+    assertQuerySucceeded(restrictionError, "Unable to load the IP restriction");
+    if (!restriction) throw new Response("IP restriction not found", { status: 404 });
+    if (
+      restriction.status !== "active" ||
+      !restriction.visitor_id ||
+      !restriction.ip_address ||
+      !restriction.cloudflare_rule_id
+    ) {
+      return { verified: false, reason: "restriction_not_active" as const };
+    }
+
+    const zoneHostname = zoneHostnameSchema.safeParse(
+      process.env.CLOUDFLARE_ZONE_HOSTNAME?.trim().toLowerCase() ?? "",
+    );
+    if (!zoneHostname.success) {
+      throw new Response("A valid Cloudflare zone hostname is required for verification", {
+        status: 409,
+      });
+    }
+
+    let verification: Awaited<ReturnType<typeof verifyCloudflareRestriction>>;
+    try {
+      verification = await verifyCloudflareRestriction(
+        restriction.ip_address,
+        restriction.id,
+        restriction.cloudflare_rule_id,
+        zoneHostname.data,
+      );
+    } catch (error) {
+      console.error("[honeypot] Cloudflare restriction verification request failed", error);
+      throw new Error(cloudflareFailureMessage(error));
+    }
+    if (verification.verified) {
+      const { data: updated, error: verifyTimestampError } = await supabaseAdmin
+        .from("honeypot_ip_restrictions")
+        .update({ updated_at: new Date().toISOString() })
+        .eq("id", restriction.id)
+        .eq("status", "active")
+        .select("id")
+        .maybeSingle();
+      assertQuerySucceeded(verifyTimestampError, "Unable to save Cloudflare verification time");
+      if (!updated) {
+        throw new Response("Restriction status changed during verification; reload the record", {
+          status: 409,
+        });
+      }
+      return verification;
+    }
+
+    const failedAt = new Date().toISOString();
+    const { error: updateError } = await supabaseAdmin
+      .from("honeypot_ip_restrictions")
+      .update({ status: "failed", released_at: failedAt, updated_at: failedAt })
+      .eq("id", restriction.id)
+      .eq("status", "active");
+    if (updateError) {
+      console.error("[honeypot] Failed verification could not synchronize restriction status");
+      throw new Error("Cloudflare enforcement is unverified and restriction status needs review");
+    }
+
+    const { error: eventError } = await supabaseAdmin
+      .from("honeypot_events")
+      .update({ status: "confirmed_suspicious" })
+      .eq("visitor_id", restriction.visitor_id)
+      .eq("status", "restricted");
+    const { error: auditError } = await supabaseAdmin.from("honeypot_admin_audit").insert({
+      visitor_id: restriction.visitor_id,
+      restriction_id: restriction.id,
+      administrator_id: context.userId,
+      action: "restriction_failed",
+      outcome: "failed",
+      details: { phase: "verification", reason: verification.reason },
+    });
+    if (eventError || auditError) {
+      console.error("[honeypot] Failed verification state needs administrative review");
+      throw new Error("Cloudflare enforcement failed verification; related records need review");
+    }
+    return verification;
   });
 
 const unrestrictSchema = z.object({
@@ -680,7 +841,8 @@ export const unrestrictHoneypotVisitor = createServerFn({ method: "POST" })
         restriction.id,
         restriction.cloudflare_rule_id,
       );
-    } catch {
+    } catch (error) {
+      console.error("[honeypot] Cloudflare restriction removal failed", error);
       const { error: restoreError } = await supabaseAdmin
         .from("honeypot_ip_restrictions")
         .update({ status: "active", updated_at: new Date().toISOString() })

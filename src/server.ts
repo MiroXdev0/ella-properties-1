@@ -1,7 +1,10 @@
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import { handleHoneypotRequest, runHoneypotRetention } from "./lib/honeypot/detection.server";
-import { expireCloudflareRestrictions } from "./lib/honeypot/cloudflare.server";
+import {
+  enforceHoneypotRestriction,
+  expireCloudflareRestrictions,
+} from "./lib/honeypot/cloudflare.server";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -63,6 +66,9 @@ function withSecurityHeaders(response: Response): Response {
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      const restrictionResponse = await enforceHoneypotRestriction(request);
+      if (restrictionResponse) return withSecurityHeaders(restrictionResponse);
+
       const honeypotResponse = await handleHoneypotRequest(request);
       if (honeypotResponse) return withSecurityHeaders(honeypotResponse);
 
@@ -86,14 +92,14 @@ export default {
   async scheduled() {
     try {
       await expireCloudflareRestrictions();
-    } catch {
-      console.error("[honeypot] Scheduled IP restriction expiry failed");
+    } catch (error) {
+      console.error("[honeypot] Scheduled IP restriction expiry failed", error);
     }
 
     try {
       await runHoneypotRetention();
-    } catch {
-      console.error("[honeypot] Scheduled retention cleanup failed");
+    } catch (error) {
+      console.error("[honeypot] Scheduled retention cleanup failed", error);
     }
   },
 };

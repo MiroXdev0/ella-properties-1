@@ -4,7 +4,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const ipSchema = z.string().ip();
 const ruleSchema = z.object({
-  id: z.string().min(1),
+  id: z.string().min(1).max(32),
   configuration: z.object({ target: z.string(), value: z.string() }),
   mode: z.string(),
   notes: z.string().nullable().optional(),
@@ -21,10 +21,30 @@ class CloudflareApiError extends Error {
   }
 }
 
+export class CloudflareRestrictionCleanupError extends Error {
+  constructor(
+    readonly cloudflareRuleId: string,
+    options?: ErrorOptions,
+  ) {
+    super("Cloudflare restriction verification failed and cleanup is pending", options);
+  }
+}
+
+export function cloudflareFailureMessage(error: unknown): string {
+  if (error instanceof CloudflareRestrictionCleanupError) {
+    return "Cloudflare rule verification failed; removal is pending automatic retry";
+  }
+  if (error instanceof CloudflareApiError) {
+    if (error.status === 429) return "Cloudflare rate-limited the request; retry in a moment";
+    return `Cloudflare rejected the request (HTTP ${error.status})`;
+  }
+  return "Cloudflare could not verify the enforcement operation";
+}
+
 function getCloudflareConfig() {
   const token = process.env.CLOUDFLARE_API_TOKEN;
   const zoneId = process.env.CLOUDFLARE_ZONE_ID;
-  if (!token || !zoneId) {
+  if (!token || !zoneId || !/^[a-f0-9]{32}$/i.test(zoneId)) {
     throw new Error("Cloudflare restriction credentials are not configured");
   }
   return {
@@ -122,18 +142,40 @@ async function getRule(ruleId: string): Promise<CloudflareRule | null> {
     "GET",
   );
   if (response.status === 404) return null;
-  return parseCloudflarePayload(payload, response);
+  const rule = parseCloudflarePayload(payload, response);
+  if (rule.id !== ruleId) throw new Error("Cloudflare returned a different rule ID");
+  return rule;
 }
 
 function assertOwnedRule(rule: CloudflareRule, restrictionId: string, ipAddress: string): void {
+  const expectedIp = canonicalIp(ipAddress);
+  const actualIp = canonicalIp(rule.configuration.value);
   if (
     rule.mode !== "block" ||
     rule.configuration.target !== ipTarget(ipAddress) ||
-    rule.configuration.value.toLowerCase() !== ipAddress.toLowerCase() ||
+    !expectedIp ||
+    actualIp !== expectedIp ||
     rule.notes !== `Ella honeypot restriction ${restrictionId}`
   ) {
     throw new Error("Cloudflare rule verification failed");
   }
+}
+
+export async function verifyCloudflareRestriction(
+  ipAddress: string,
+  restrictionId: string,
+  cloudflareRuleId: string,
+  zoneHostname: string,
+): Promise<{ verified: boolean; reason: "verified" | "missing" | "mismatch" }> {
+  await verifyCloudflareZoneHostname(zoneHostname);
+  const rule = await getRule(cloudflareRuleId);
+  if (!rule) return { verified: false, reason: "missing" };
+  try {
+    assertOwnedRule(rule, restrictionId, ipAddress);
+  } catch {
+    return { verified: false, reason: "mismatch" };
+  }
+  return { verified: true, reason: "verified" };
 }
 
 export async function createCloudflareRestriction(
@@ -145,7 +187,7 @@ export async function createCloudflareRestriction(
   const notes = `Ella honeypot restriction ${restrictionId}`;
   const { response, payload } = await callCloudflare(baseUrl, "POST", {
     mode: "block",
-    configuration: { target: ipTarget(ipAddress), value: ipAddress },
+    configuration: { target: ipTarget(ipAddress), value: canonicalIp(ipAddress) },
     notes,
   });
   const created = parseCloudflarePayload(payload, response);
@@ -155,36 +197,114 @@ export async function createCloudflareRestriction(
     if (!verified) throw new Error("Cloudflare did not retain the created IP restriction");
     assertOwnedRule(verified, restrictionId, ipAddress);
     return verified.id;
-  } catch {
-    if (
+  } catch (verificationError) {
+    const isOwnedRule =
       created.mode === "block" &&
       created.configuration.target === ipTarget(ipAddress) &&
-      created.configuration.value.toLowerCase() === ipAddress.toLowerCase() &&
-      created.notes === notes
-    ) {
-      try {
-        const { response: deleteResponse, payload: deletePayload } = await callCloudflare(
-          `${baseUrl}/${encodeURIComponent(created.id)}`,
-          "DELETE",
-        );
-        const deleted = z
-          .object({ success: z.literal(true), result: z.object({ id: z.string() }) })
-          .safeParse(deletePayload);
-        if (
-          !deleteResponse.ok ||
-          !deleted.success ||
-          deleted.data.result.id !== created.id ||
-          (await getRule(created.id))
-        ) {
-          throw new Error("Cloudflare rollback could not be verified");
-        }
-      } catch {
-        console.error("[honeypot] Unverified Cloudflare restriction may require manual cleanup");
-      }
+      canonicalIp(created.configuration.value) === canonicalIp(ipAddress) &&
+      created.notes === notes;
+    if (!isOwnedRule) {
+      throw new Error("Cloudflare returned an unrecognized IP restriction", {
+        cause: verificationError,
+      });
     }
-    throw new Error("Cloudflare did not verify the created IP restriction");
+
+    try {
+      const { response: deleteResponse, payload: deletePayload } = await callCloudflare(
+        `${baseUrl}/${encodeURIComponent(created.id)}`,
+        "DELETE",
+      );
+      const deleted = z
+        .object({ success: z.literal(true), result: z.object({ id: z.string() }) })
+        .safeParse(deletePayload);
+      if (
+        !deleteResponse.ok ||
+        !deleted.success ||
+        deleted.data.result.id !== created.id ||
+        (await getRule(created.id))
+      ) {
+        throw new Error("Cloudflare rollback could not be verified");
+      }
+    } catch (cleanupError) {
+      console.error("[honeypot] Unverified Cloudflare restriction cleanup failed", cleanupError);
+      throw new CloudflareRestrictionCleanupError(created.id, {
+        cause: verificationError,
+      });
+    }
+
+    throw new Error("Cloudflare did not verify the created IP restriction", {
+      cause: verificationError,
+    });
   }
 }
+
+export function createHoneypotRestrictionGuard(
+  isRestricted: (ipAddress: string) => Promise<boolean>,
+): (request: Request) => Promise<Response | null> {
+  return async (request) => {
+    const zoneHostname = process.env.CLOUDFLARE_ZONE_HOSTNAME?.trim().toLowerCase();
+    const requestHostname = new URL(request.url).hostname.toLowerCase().replace(/\.$/, "");
+    const zoneHostnameIsValid =
+      !!zoneHostname &&
+      zoneHostname.length <= 253 &&
+      /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(zoneHostname) &&
+      zoneHostname !== "workers.dev" &&
+      !zoneHostname.endsWith(".workers.dev") &&
+      zoneHostname !== "pages.dev" &&
+      !zoneHostname.endsWith(".pages.dev");
+    if (
+      zoneHostnameIsValid &&
+      (requestHostname === zoneHostname || requestHostname.endsWith(`.${zoneHostname}`))
+    ) {
+      return null;
+    }
+
+    const headerIp = request.headers.get("cf-connecting-ip");
+    const ipAddress = headerIp ? canonicalIp(headerIp) : null;
+    if (!ipAddress) return null;
+
+    try {
+      if (!(await isRestricted(ipAddress))) return null;
+    } catch (error) {
+      console.error("[honeypot] Request enforcement lookup failed", error);
+      return new Response("Temporarily unable to verify access", {
+        status: 503,
+        headers: {
+          "content-type": "text/plain; charset=utf-8",
+          "cache-control": "no-store",
+        },
+      });
+    }
+
+    return new Response("Access restricted", {
+      status: 403,
+      headers: {
+        "content-type": "text/plain; charset=utf-8",
+        "cache-control": "no-store",
+      },
+    });
+  };
+}
+
+export function restrictionRequiresWorkerBlock(status: string, cloudflareRuleId: string | null) {
+  return (
+    status === "active" ||
+    status === "pending_removal" ||
+    (status === "pending" && cloudflareRuleId !== null)
+  );
+}
+
+export const enforceHoneypotRestriction = createHoneypotRestrictionGuard(async (ipAddress) => {
+  const { data, error } = await supabaseAdmin
+    .from("honeypot_ip_restrictions")
+    .select("id, status, cloudflare_rule_id")
+    .eq("ip_address", ipAddress)
+    .in("status", ["pending", "active", "pending_removal"]);
+  if (error) throw new Error("Unable to verify active IP restrictions");
+  return (data ?? []).some((restriction) =>
+    restrictionRequiresWorkerBlock(restriction.status, restriction.cloudflare_rule_id),
+  );
+});
 
 export async function verifyCloudflareZoneHostname(hostname: string): Promise<void> {
   const { zoneId } = getCloudflareConfig();
@@ -245,7 +365,8 @@ export async function expireCloudflareRestrictions(): Promise<void> {
   const { data: pending, error: pendingError } = await supabaseAdmin
     .from("honeypot_ip_restrictions")
     .select("id, visitor_id, ip_address, cloudflare_rule_id, expires_at, status")
-    .eq("status", "pending_removal")
+    .in("status", ["pending", "pending_removal"])
+    .not("cloudflare_rule_id", "is", null)
     .order("updated_at", { ascending: true })
     .limit(50);
   if (pendingError) throw new Error("Unable to load pending honeypot restriction removals");
@@ -256,14 +377,14 @@ export async function expireCloudflareRestrictions(): Promise<void> {
 
   for (const restriction of restrictions.values()) {
     const isExpired = restriction.expires_at !== null && restriction.expires_at <= now;
-    if (restriction.status === "active") {
+    if (restriction.status === "active" || restriction.status === "pending") {
       const { error } = await supabaseAdmin
         .from("honeypot_ip_restrictions")
         .update({ status: "pending_removal", updated_at: now })
         .eq("id", restriction.id)
-        .eq("status", "active");
+        .eq("status", restriction.status);
       if (error) {
-        console.error("[honeypot] Unable to prepare an expired restriction for removal");
+        console.error("[honeypot] Unable to prepare a restriction for removal");
         continue;
       }
     }
@@ -278,12 +399,13 @@ export async function expireCloudflareRestrictions(): Promise<void> {
       } else {
         throw new Error("Restriction is missing its Cloudflare rule information");
       }
-    } catch {
-      console.error("[honeypot] Cloudflare restriction removal failed; it will be retried");
+    } catch (error) {
+      console.error("[honeypot] Cloudflare restriction removal failed; it will be retried", error);
       continue;
     }
 
-    const nextStatus = isExpired ? "expired" : "unbanned";
+    const nextStatus =
+      restriction.status === "pending" ? "failed" : isExpired ? "expired" : "unbanned";
     const { error: updateError } = await supabaseAdmin
       .from("honeypot_ip_restrictions")
       .update({
@@ -312,9 +434,18 @@ export async function expireCloudflareRestrictions(): Promise<void> {
       visitor_id: restriction.visitor_id,
       restriction_id: restriction.id,
       administrator_id: null,
-      action: isExpired ? "restriction_expired" : "restriction_removed",
+      action:
+        restriction.status === "pending"
+          ? "restriction_failed"
+          : isExpired
+            ? "restriction_expired"
+            : "restriction_removed",
       outcome: "success",
-      details: { automated: true, cloudflare_rule_id: restriction.cloudflare_rule_id },
+      details: {
+        automated: true,
+        cloudflare_rule_id: restriction.cloudflare_rule_id,
+        orphaned_pending_rule: restriction.status === "pending",
+      },
     });
     if (auditError) console.error("[honeypot] Unable to record restriction expiration audit");
   }

@@ -1,6 +1,6 @@
 begin;
 
-select plan(29);
+select plan(31);
 
 select ok(
   (
@@ -19,6 +19,11 @@ select ok(
       and relforcerowsecurity
   ),
   'all honeypot tables force row-level security'
+);
+
+select ok(
+  to_regclass('public.honeypot_one_live_restriction_per_ip_idx') is not null,
+  'an IP cannot have multiple pending or active honeypot restrictions'
 );
 
 select ok(
@@ -342,6 +347,9 @@ insert into public.honeypot_admin_audit (
 select visitor_id, event_id, 'retention_purge', now() - interval '366 days'
 from honeypot_test_fixture;
 
+insert into public.honeypot_visitors (source_hash, ip_address)
+values (repeat('c', 64), '203.0.113.10'::inet);
+
 insert into public.honeypot_ip_restrictions (
   visitor_id, ip_address, cloudflare_rule_id, status, duration, reason,
   administrator_id, created_at, updated_at
@@ -350,6 +358,29 @@ select visitor_id, '203.0.113.10'::inet, 'honeypot-test-active-rule', 'active',
   'permanent', 'Test retention', gen_random_uuid(), now() - interval '400 days',
   now() - interval '400 days'
 from honeypot_test_fixture;
+
+do $$
+begin
+  insert into public.honeypot_ip_restrictions (
+    visitor_id, ip_address, cloudflare_rule_id, status, duration, reason, administrator_id
+  )
+  select id, '203.0.113.10'::inet, 'honeypot-test-duplicate-rule', 'active',
+    'permanent', 'Duplicate test', gen_random_uuid()
+  from public.honeypot_visitors
+  where source_hash = repeat('c', 64);
+exception
+  when unique_violation then null;
+end;
+$$;
+
+select ok(
+  not exists (
+    select 1
+    from public.honeypot_ip_restrictions
+    where cloudflare_rule_id = 'honeypot-test-duplicate-rule'
+  ),
+  'a different visitor record cannot create a duplicate live restriction for the same IP'
+);
 
 insert into public.honeypot_ip_restrictions (
   visitor_id, ip_address, cloudflare_rule_id, status, duration, reason,
